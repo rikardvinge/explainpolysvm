@@ -26,7 +26,6 @@ def count_index_occurrences(elems: List[Tuple]):
     """
     counts_unique = set()
     elem_counts = []
-    # current_label = 0
     for elem in elems:
         unique_idxs = set(elem)
         counts = []
@@ -37,7 +36,7 @@ def count_index_occurrences(elems: List[Tuple]):
         counts = ''.join([str(sorted_count) for sorted_count in counts])
         counts_unique.add(counts)
         elem_counts.append(counts)
-    return list(counts_unique), elem_counts
+    return elem_counts, list(counts_unique)
 
 
 def count_symmetry(count_str: str, tensor_rank: int = None) -> int:
@@ -88,7 +87,7 @@ def map_symmetry(count_strs: List[str], count_strs_unique: List[str] = None):
 
 class ExPSVM:
     def __init__(self, sv: np.ndarray, alpha: np.array, class_label: np.ndarray, kernel_d: int, kernel_r: float,
-                 p: int = None):
+                 p: int = None) -> None:
         # Number of features
         if p is None:
             self.p = sv.shape[0]
@@ -105,5 +104,19 @@ class ExPSVM:
         self.kernel_r = kernel_r
 
         # Instantiate compressed polynomial SVM
-        self.unique_index = {ind: None for ind in np.arange(1, self.d+1)}
-        self.sym_count = {ind: None for ind in np.arange(1, self.d+1)}
+        self.unique_idx = {ind: None for ind in np.arange(1, self.kernel_d + 1)}
+        self.sym_count = {ind: None for ind in np.arange(1, self.kernel_d + 1)}
+
+    def dekernelize(self):
+        self.unique_idx[1] = np.ones(self.p)
+        self.sym_count[1] = np.ones(self.p)
+
+        # For higher than 2 dimensional polynomial kernels.
+        if self.kernel_d > 1:
+            for d in np.arange(2, self.kernel_d + 1):
+                idx = create_unique_index(self.p, d)
+                labels, sym_count_unique = count_index_occurrences(idx)
+                sym_count = map_symmetry(labels, sym_count_unique)
+                self.unique_idx[d] = np.array(idx)
+                self.sym_count[d] = np.array(sym_count)
+        return
