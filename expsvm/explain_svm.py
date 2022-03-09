@@ -95,14 +95,9 @@ class ExPSVM:
         self.poly_coeff = {ind: None for ind in np.arange(1, self.kernel_d + 1)}
 
     def _multiplication_transform(self) -> None:
-        self.idx_unique[1] = np.ones(self.p)
-        self.sym_count[1] = np.ones(self.p)
-
-        # For higher than 2 dimensional polynomial kernels.
-        if self.kernel_d > 1:
-            for d in np.arange(2, self.kernel_d + 1):
-                tp = TensorPerm(self.kernel_d, self.p)
-                tp.n_perm()
-                self.idx_unique[d] = np.array(tp.idx_unique)
-                self.sym_count[d] = np.array(tp.idx_n_perm)
+        for d in np.arange(1, self.kernel_d + 1):
+            tp = TensorPerm(d, self.p)
+            tp.n_perm()
+            self.idx_unique[d] = np.array(tp.idx_unique)
+            self.sym_count[d] = np.array(tp.idx_n_perm)
 

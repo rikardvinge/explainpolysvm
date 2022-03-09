@@ -79,12 +79,12 @@ class TestExPSVM:
         d = 2
         es = exp.ExPSVM(sv=None, alpha=0, class_label=0, kernel_d=d, kernel_r=None, p=p)
         es._multiplication_transform()
-        true_idx = {1:np.array([0,1,2]), 2:np.array([(0, 0), (0, 1), (0, 2),
+        true_idx = {1:np.array([[0],[1],[2]]), 2:np.array([(0, 0), (0, 1), (0, 2),
                     (1, 1), (1, 2), (2, 2)])}
         true_count = {1:np.array([1,1,1]), 2:np.array([1, 2, 2, 1, 2, 1])}
         test_lst = []
         for dim in np.arange(1,d+1):
             for ind, idx in enumerate(true_idx[dim]):
-                es_ind = es.idx_unique[dim] == idx
+                es_ind = np.where(np.all(es.idx_unique[dim] == idx,axis=1))[0][0]
                 test_lst.append(es.sym_count[dim][es_ind] == true_count[dim][ind])
         assert all(test_lst)
