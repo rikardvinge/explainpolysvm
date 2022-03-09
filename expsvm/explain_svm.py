@@ -66,10 +66,6 @@ class TensorPerm:
         else:
             perm_reduction = np.prod([np.math.factorial(count) for count in counts_list])
         n_perm = int(np.math.factorial(self.rank)/perm_reduction)
-        # dims_left = self.rank
-        # for count in counts_list:
-        #     n_perm *= comb(dims_left, count)
-        #     dims_left -= count
 
         return n_perm
 
@@ -87,24 +83,26 @@ class ExPSVM:
         self.sv = sv
         self.alpha = alpha
         self.label = class_label
+        self.signed_alpha = alpha*class_label
 
         # Polynomial kernel parameters
         self.kernel_d = kernel_d
         self.kernel_r = kernel_r
 
         # Instantiate compressed polynomial SVM
-        self.unique_idx = {ind: None for ind in np.arange(1, self.kernel_d + 1)}
+        self.idx_unique = {ind: None for ind in np.arange(1, self.kernel_d + 1)}
         self.sym_count = {ind: None for ind in np.arange(1, self.kernel_d + 1)}
+        self.poly_coeff = {ind: None for ind in np.arange(1, self.kernel_d + 1)}
 
-    def dekernelize(self):
-        self.unique_idx[1] = np.ones(self.p)
+    def _multiplication_transform(self) -> None:
+        self.idx_unique[1] = np.ones(self.p)
         self.sym_count[1] = np.ones(self.p)
 
         # For higher than 2 dimensional polynomial kernels.
         if self.kernel_d > 1:
             for d in np.arange(2, self.kernel_d + 1):
-                tensor_idx = create_unique_index(self.p, d)
-                sym_count = n_perm(tensor_idx, self.kernel_d)
-                self.unique_idx[d] = np.array(tensor_idx)
-                self.sym_count[d] = np.array(sym_count)
-        return
+                tp = TensorPerm(self.kernel_d, self.p)
+                tp.n_perm()
+                self.idx_unique[d] = np.array(tp.idx_unique)
+                self.sym_count[d] = np.array(tp.idx_n_perm)
+

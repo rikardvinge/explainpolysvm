@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 from expsvm import explain_svm as exp
 
@@ -45,7 +46,12 @@ class TestExPSVM:
         Check that the number of permutations in 5d tensor.
         The element used is of the kind (i,j,j,k,k).
         This kind of element have 30 possible permutations:
-        (i,j,j,k,k), (k,i,j,j,k), (k,k,i,j,j), ...
+        i first: ijjkk, ikjkj, ikkjj, ijkkj - 4 permutations
+        i 2nd: jijkk, jikjk, jikkj, kijjk, kijkj, kikjj - 6 permutations.
+        i 3rd: jjikk, jikkj, jkijk, kjikj, kjijk, kkijj - 6 permutations
+        i 4th: jjkik, jkjik, jkkij, kjjik, kjkij, kkjij - 6 permutations
+        i 5th: jjkki, jkjki, jkkji, kjkji, kjjki, kkjji - 6 permutations
+        Total: 30
         """
         p = 8
         d = 5
@@ -66,4 +72,19 @@ class TestExPSVM:
         for ind, idx in enumerate(true_idx):
             tp_ind = tp.idx_unique.index(idx)
             test_lst.append(tp.idx_n_perm[tp_ind] == true_count[ind])
+        assert all(test_lst)
+
+    def test_multiplication_transform(self):
+        p = 3
+        d = 2
+        es = exp.ExPSVM(sv=None, alpha=0, class_label=0, kernel_d=d, kernel_r=None, p=p)
+        es._multiplication_transform()
+        true_idx = {1:np.array([0,1,2]), 2:np.array([(0, 0), (0, 1), (0, 2),
+                    (1, 1), (1, 2), (2, 2)])}
+        true_count = {1:np.array([1,1,1]), 2:np.array([1, 2, 2, 1, 2, 1])}
+        test_lst = []
+        for dim in np.arange(1,d+1):
+            for ind, idx in enumerate(true_idx[dim]):
+                es_ind = es.idx_unique[dim] == idx
+                test_lst.append(es.sym_count[dim][es_ind] == true_count[dim][ind])
         assert all(test_lst)
