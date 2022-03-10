@@ -15,7 +15,8 @@ class TensorPerm:
         """
         Create set of tensor indexes where the order of the indexes does not matter.
         """
-        return list(it.combinations_with_replacement(np.arange(self.dim), self.rank))
+        list_idx = list(it.combinations_with_replacement(np.arange(self.dim), self.rank))
+        return [','.join([str(idx) for idx in tup]) for tup in list_idx]
 
     def _count_index_occurrences(self):
         """
@@ -27,7 +28,7 @@ class TensorPerm:
         counts_unique = set()
         elem_counts = []
         for elem in self.idx_unique:
-            idx_set = set(elem)
+            idx_set = set(elem.split(','))
             counts = []
             for idx in idx_set:
                 count = elem.count(idx)
@@ -71,7 +72,7 @@ class TensorPerm:
 
 
 class ExPSVM:
-    def __init__(self, sv: np.ndarray, alpha: np.array, class_label: np.ndarray, kernel_d: int, kernel_r: float,
+    def __init__(self, sv: np.ndarray, dual_coeff: np.ndarray, kernel_d: int, kernel_r: float,
                  p: int = None) -> None:
         # Number of features
         if p is None:
@@ -81,23 +82,87 @@ class ExPSVM:
 
         # SVM model
         self.sv = sv
-        self.alpha = alpha
-        self.label = class_label
-        self.signed_alpha = alpha*class_label
+        self.dual_coef = np.reshape(dual_coeff,(-1,1))
 
         # Polynomial kernel parameters
         self.kernel_d = kernel_d
         self.kernel_r = kernel_r
 
         # Instantiate compressed polynomial SVM
-        self.idx_unique = {ind: None for ind in np.arange(1, self.kernel_d + 1)}
-        self.sym_count = {ind: None for ind in np.arange(1, self.kernel_d + 1)}
-        self.poly_coeff = {ind: None for ind in np.arange(1, self.kernel_d + 1)}
+        # self.idx_unique = dict()
+        self.idx_unique = []
+        # self.perm_count = dict()
+        self.perm_count = np.array([])#[]
+        self.idx_dim = np.array([])#[]
+        self.poly_coef = {d: comb(self.kernel_d, d) * (self.kernel_r ** (self.kernel_d - d)) for d in np.arange(1, self.kernel_d + 1)}
 
     def _multiplication_transform(self) -> None:
+        """
+        For each polynomial term, identify unique indexes and the number of permutations of each index.
+        """
         for d in np.arange(1, self.kernel_d + 1):
             tp = TensorPerm(d, self.p)
             tp.n_perm()
-            self.idx_unique[d] = np.array(tp.idx_unique)
-            self.sym_count[d] = np.array(tp.idx_n_perm)
+            self.idx_unique = np.concatenate((self.idx_unique,tp.idx_unique))
+            self.perm_count = np.concatenate((self.perm_count,tp.idx_n_perm))
+            self.idx_dim = np.concatenate((self.idx_dim,d*np.ones((len(tp.idx_unique),))))
+            # self.idx_unique[d] = np.array(tp.idx_unique)
+            # self.perm_count[d] = np.array(tp.idx_n_perm)
+            # self.perm_count = np.array(self.perm_count)
 
+    def _compress_transform(self, x: np.ndarray, memory_optimize: bool = False, to_array: bool = False):
+        """
+        :param: x: Observation(s) to transform. Shape of ndarray is assumed to be n_observations-by-n_features.
+        :param memory_optimize: Set to False (default) for handling all support vectors and transformations at once. If True, handle one support vector at a time for reduced memory usage.
+        :param to_array: Set to True if output should be array instead of dict.
+        :return:
+        """
+        transf = dict()
+        for d in np.arange(1, self.kernel_d + 1):
+            d_idx = [[int(ch) for ch in idx.split(',')] for idx in self.idx_unique[self.idx_dim==d]]
+            if memory_optimize:
+                sv_interaction = np.zeros((x.shape[0],len(d_idx)))
+                for ind, v in enumerate(x):
+                    sv_interaction[ind,:] = np.squeeze(np.prod(v[d_idx], axis=1))
+            else:
+                sv_interaction = np.squeeze(np.prod(x[:,d_idx], axis=2))
+            transf[d] = sv_interaction
+        if to_array:
+            return self.dict2array(transf)
+        else:
+            return transf
+
+    @classmethod
+    def dict2array(cls, di) -> np.ndarray:
+        """
+        Flatten dict to array. Dict is assumed to have structure {1:array_1, 2:array_2,...} where array_x are 2d arrays where rows are assumed belonging together.
+        Example: The array
+        {1:np.array([[1, 2, 3], [1, 2, 3]]),2:np.array([[1, 2, 3, 4, 6, 9], [1, 2, 3, 4, 6, 9]])}
+        is returned as [[1, 2, 3, 1, 2, 3, 4, 6, 9], [1, 2, 3, 1, 2, 3, 4, 6, 9]]
+
+        :param di: Dictionary to transform
+        :return:
+        """
+        return np.concatenate([*di.values()], axis=1)
+
+
+    def dekernelize(self, memory_optimize: bool = False):
+        """
+        Calculate compressed linear version for SVM model with polynomial kernel.
+        :param memory_optimize:
+        :return:
+        """
+        if not ((self.idx_unique) and (self.perm_count)):
+            self._multiplication_transform()
+        compressed_transform = self._compress_transform(x=self.sv, memory_optimize=memory_optimize, to_array=False)
+
+        # Multiply by dual coefficients (alpha and labels), sum over support vectors, and scale with polynomial coefficient
+        for d in compressed_transform.keys():
+            compressed_transform[d] = self.poly_coef[d]*np.sum(np.multiply(self.dual_coef, compressed_transform[d]), axis=0)
+
+        # Create linear model
+        print()
+        print(compressed_transform.values())
+        lin = np.concatenate(list(compressed_transform.values()))
+        print(lin)
+        print(lin.shape)
