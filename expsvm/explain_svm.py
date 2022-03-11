@@ -89,12 +89,12 @@ class ExPSVM:
         self.kernel_r = kernel_r
 
         # Instantiate compressed polynomial SVM
-        # self.idx_unique = dict()
         self.idx_unique = []
-        # self.perm_count = dict()
-        self.perm_count = np.array([])#[]
-        self.idx_dim = np.array([])#[]
-        self.poly_coef = {d: comb(self.kernel_d, d) * (self.kernel_r ** (self.kernel_d - d)) for d in np.arange(1, self.kernel_d + 1)}
+        self.perm_count = np.array([])
+        self.idx_dim = np.array([])
+        self.poly_coef = {d: comb(self.kernel_d, d) * (self.kernel_r ** (self.kernel_d - d))
+                          for d in np.arange(1, self.kernel_d + 1)}
+        self.mask = None
 
     def _multiplication_transform(self) -> None:
         """
@@ -106,31 +106,30 @@ class ExPSVM:
             self.idx_unique = np.concatenate((self.idx_unique,tp.idx_unique))
             self.perm_count = np.concatenate((self.perm_count,tp.idx_n_perm))
             self.idx_dim = np.concatenate((self.idx_dim,d*np.ones((len(tp.idx_unique),))))
-            # self.idx_unique[d] = np.array(tp.idx_unique)
-            # self.perm_count[d] = np.array(tp.idx_n_perm)
-            # self.perm_count = np.array(self.perm_count)
 
-    def _compress_transform(self, x: np.ndarray, memory_optimize: bool = False, to_array: bool = False):
+    def _compress_transform(self, x: np.ndarray, reduce_memory: bool = False, to_array: bool = False):
         """
         :param: x: Observation(s) to transform. Shape of ndarray is assumed to be n_observations-by-n_features.
-        :param memory_optimize: Set to False (default) for handling all support vectors and transformations at once. If True, handle one support vector at a time for reduced memory usage.
+        :param reduce_memory: Set to False (default) for handling all support vectors and transformations at once. If True, handle one support vector at a time for reduced memory usage.
         :param to_array: Set to True if output should be array instead of dict.
-        :return:
+        :return: transf and transf_idx. The former, transf is the transformed features in x while the second
         """
         transf = dict()
+        transf_idx = dict()
         for d in np.arange(1, self.kernel_d + 1):
             d_idx = [[int(ch) for ch in idx.split(',')] for idx in self.idx_unique[self.idx_dim==d]]
-            if memory_optimize:
+            if reduce_memory:
                 sv_interaction = np.zeros((x.shape[0],len(d_idx)))
                 for ind, v in enumerate(x):
                     sv_interaction[ind,:] = np.squeeze(np.prod(v[d_idx], axis=1))
             else:
                 sv_interaction = np.squeeze(np.prod(x[:,d_idx], axis=2))
             transf[d] = sv_interaction
+            transf_idx[d] = np.array(d_idx)
         if to_array:
             return self.dict2array(transf)
         else:
-            return transf
+            return transf, transf_idx
 
     @classmethod
     def dict2array(cls, di) -> np.ndarray:
@@ -145,16 +144,15 @@ class ExPSVM:
         """
         return np.concatenate([*di.values()], axis=1)
 
-
-    def dekernelize(self, memory_optimize: bool = False):
+    def dekernelize(self, reduce_memory: bool = False):
         """
         Calculate compressed linear version for SVM model with polynomial kernel.
-        :param memory_optimize:
+        :param reduce_memory:
         :return:
         """
         if not ((self.idx_unique) and (self.perm_count)):
             self._multiplication_transform()
-        compressed_transform = self._compress_transform(x=self.sv, memory_optimize=memory_optimize, to_array=False)
+        compressed_transform, _ = self._compress_transform(x=self.sv, reduce_memory=reduce_memory, to_array=False)
 
         # Multiply by dual coefficients (alpha and labels), sum over support vectors, and scale with polynomial coefficient
         for d in compressed_transform.keys():

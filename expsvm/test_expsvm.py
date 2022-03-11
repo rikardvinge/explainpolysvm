@@ -67,8 +67,6 @@ class TestExPSVM:
         d = 2
         tp = exp.TensorPerm(d, p)
         tp.n_perm()
-        # true_idx = [(0, 0), (0, 1), (0, 2),
-        #             (1, 1), (1, 2), (2, 2)]
         true_idx = ['0,0', '0,1', '0,2', '1,1', '1,2', '2,2']
         true_count = [1, 2, 2, 1, 2, 1]
         compare = []
@@ -93,18 +91,19 @@ class TestExPSVM:
         true_count = np.array([1, 1, 1, 1, 2, 2, 1, 2, 1])
         true_dim = np.array([1, 1, 1, 2, 2, 2, 2, 2, 2])
         compare = []
-        # for dim in np.arange(1,d+1):
-        #     for ind, idx in enumerate(true_idx[dim]):
-        #         es_ind = np.where(np.all(es.idx_unique[dim] == idx, axis=1))[0][0]
-        #         compare.append(es.perm_count[dim][es_ind] == true_count[dim][ind])
         for ind, idx in enumerate(true_idx):
             es_ind = np.where(es.idx_unique == idx)[0]
             compare.append(np.all(es.perm_count[es_ind] == true_count[ind]))
             compare.append(np.all(es.idx_dim[es_ind] == true_dim[ind]))
         assert all(compare)
 
+    def test_dict2array(self):
+        di = {1: np.array([[1, 2, 3], [1, 2, 3]]),
+              2: np.array([[1, 2, 3, 4, 6, 9], [1, 2, 3, 4, 6, 9]])}
+        arr = exp.ExPSVM.dict2array(di)
+        assert np.all(arr == [[1, 2, 3, 1, 2, 3, 4, 6, 9], [1, 2, 3, 1, 2, 3, 4, 6, 9]])
 
-    def test_compressed_transform_full(self):
+    def test_compressed_transform_full(self, reduce_memory=False):
         n_sv = 2
         p = 3
         d = 2
@@ -112,69 +111,30 @@ class TestExPSVM:
         arr = np.repeat(np.arange(1, p+1).reshape((-1, p)), n_sv, axis=0)
         es = exp.ExPSVM(sv=arr, dual_coeff=0, kernel_d=d, kernel_r=r, p=p)
         es._multiplication_transform()
-        print()
-        # print(es.idx_unique)
-        # print(es.idx_dim)
-        # print(es.perm_count)
-        transf = es._compress_transform(x=arr, memory_optimize=False, to_array=False)
-        # true_idx = {1: np.array([[0], [1], [2]]),
-        #             2: np.array([(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)])}
-        true_idx = ['0', '1', '2', '0,0', '0,1', '0,2', '1,1', '1,2', '2,2']
+        transf, transf_idx = es._compress_transform(x=arr, reduce_memory=False, to_array=False)
+        true_idx = {1: np.array([[0], [1], [2]]),
+                    2: np.array([(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)])}
         true_array = {1:np.array([[1, 2, 3], [1, 2, 3]]),
                       2:np.array([[1, 2, 3, 4, 6, 9], [1, 2, 3, 4, 6, 9]])}
         compare = []
-        print()
-        print(es.idx_unique)
         for dim in np.arange(1, d + 1):
-            # print(transf[dim])
-            for ind, idx in enumerate(true_idx):
-                print(idx)
-                es_ind = np.where(es.idx_unique == idx)[0][0]
-                # es_ind = np.where(np.all(es.idx_unique[dim] == idx,axis=1))[0][0]
-                print(ind, es_ind)
+            for ind, idx in enumerate(true_idx[dim]):
+                es_ind = np.where(np.all(transf_idx[dim] == idx, axis=1))[0][0]
                 compare.append(np.all(transf[dim][:,es_ind] == true_array[dim][:,ind]))
+                compare.append(np.all(transf_idx[dim][es_ind] == true_idx[dim][ind]))
         assert all(compare)
 
-    # def test_compressed_transform_memory(self):
-    #     n_sv = 2
-    #     p = 3
-    #     d = 2
-    #     r = 1
-    #     arr = np.repeat(np.arange(1, p + 1).reshape((-1, p)), n_sv, axis=0)
-    #     es = exp.ExPSVM(sv=arr, dual_coeff=0, kernel_d=d, kernel_r=r, p=p)
-    #     es._multiplication_transform()
-    #     transf = es._compress_transform(x=arr, memory_optimize=True, to_array=False)
-    #     true_idx = {1: np.array([[0], [1], [2]]),
-    #                 2: np.array([(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)])}
-    #     true_array = {1: np.array([[1, 2, 3], [1, 2, 3]]),
-    #                   2: np.array([[1, 2, 3, 4, 6, 9], [1, 2, 3, 4, 6, 9]])}
-    #     compare = []
-    #     for dim in np.arange(1, d + 1):
-    #
-    #         for ind, idx in enumerate(true_idx[dim]):
-    #             es_ind = np.where(np.all(es.idx_unique[dim] == idx, axis=1))[0][0]
-    #             compare.append(np.all(transf[dim][:, es_ind] == true_array[dim][:, ind]))
-    #     assert all(compare)
-    #
-    # def test_dict2array(self):
-    #     di = {1: np.array([[1, 2, 3], [1, 2, 3]]),
-    #           2: np.array([[1, 2, 3, 4, 6, 9], [1, 2, 3, 4, 6, 9]])}
-    #     arr = exp.ExPSVM.dict2array(di)
-    #     assert np.all(arr == [[1, 2, 3, 1, 2, 3, 4, 6, 9], [1, 2, 3, 1, 2, 3, 4, 6, 9]])
-    #
-    # def test_dekernelize(self):
-    #     n_sv = 2
-    #     p = 3
-    #     d = 2
-    #     r = 1
-    #     dual_coef = np.array([[10, -0.1]])
-    #
-    #     arr = np.repeat(np.arange(1, p + 1).reshape((-1, p)), n_sv, axis=0)
-    #     es = exp.ExPSVM(sv=arr, dual_coeff=dual_coef, kernel_d=d, kernel_r=r, p=p)
-    #
-    #     es.dekernelize()
-    #
+    def test_compressed_transform_memory(self):
+        self.test_compressed_transform_full(reduce_memory=True)
 
+    def test_dekernelize(self):
+        n_sv = 2
+        p = 3
+        d = 2
+        r = 1
+        dual_coef = np.array([[10, -0.1]])
 
+        arr = np.repeat(np.arange(1, p + 1).reshape((-1, p)), n_sv, axis=0)
+        es = exp.ExPSVM(sv=arr, dual_coeff=dual_coef, kernel_d=d, kernel_r=r, p=p)
 
-
+        es.dekernelize()
