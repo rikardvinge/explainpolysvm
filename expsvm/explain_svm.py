@@ -72,30 +72,6 @@ class TensorPerm:
 
 
 class ExPSVM:
-    def __init__(self, sv: np.ndarray, dual_coeff: np.ndarray, kernel_d: int, kernel_r: float,
-                 p: int = None) -> None:
-        # Number of features
-        if p is None:
-            self.p = sv.shape[0]
-        else:
-            self.p = p
-
-        # SVM model
-        self.sv = sv
-        self.dual_coef = np.reshape(dual_coeff,(-1,1))
-
-        # Polynomial kernel parameters
-        self.kernel_d = kernel_d
-        self.kernel_r = kernel_r
-
-        # Instantiate compressed polynomial SVM
-        self.idx_unique = []
-        self.perm_count = np.array([])
-        self.idx_dim = np.array([])
-        self.poly_coef = {d: comb(self.kernel_d, d) * (self.kernel_r ** (self.kernel_d - d))
-                          for d in np.arange(1, self.kernel_d + 1)}
-        self.mask = None
-
     def _multiplication_transform(self) -> None:
         """
         For each polynomial term, identify unique indexes and the number of permutations of each index.
@@ -107,29 +83,73 @@ class ExPSVM:
             self.perm_count = np.concatenate((self.perm_count,tp.idx_n_perm))
             self.idx_dim = np.concatenate((self.idx_dim,d*np.ones((len(tp.idx_unique),))))
 
-    def _compress_transform(self, x: np.ndarray, reduce_memory: bool = False, to_array: bool = False):
+    def __init__(self, sv: np.ndarray, dual_coeff: np.ndarray,
+                 intercept: float,
+                 kernel_d: int, kernel_r: float,
+                 p: int = None) -> None:
+        # Number of features
+        if p is None:
+            self.p = sv.shape[0]
+        else:
+            self.p = p
+
+        # SVM model
+        self.sv = sv
+        self.dual_coef = np.reshape(dual_coeff,(-1,1))
+        self.intercept = intercept
+
+        # Polynomial kernel parameters
+        self.kernel_d = kernel_d
+        self.kernel_r = kernel_r
+
+        # Instantiate compressed polynomial SVM
+        self.idx_unique = np.array([])
+        self.perm_count = np.array([])
+        self.idx_dim = np.array([])
+        self.poly_coef = {d: comb(self.kernel_d, d) * (self.kernel_r ** (self.kernel_d - d))
+                          for d in np.arange(1, self.kernel_d + 1)}
+        # self.idx_mask = []
+        self.mask_idx = np.array([])
+
+        self.linear_model = np.array([])
+
+    def _compress_transform(self, x: np.ndarray, reduce_memory: bool = False, mask: bool = False):
         """
         :param: x: Observation(s) to transform. Shape of ndarray is assumed to be n_observations-by-n_features.
         :param reduce_memory: Set to False (default) for handling all support vectors and transformations at once. If True, handle one support vector at a time for reduced memory usage.
         :param to_array: Set to True if output should be array instead of dict.
-        :return: transf and transf_idx. The former, transf is the transformed features in x while the second
+        :return: transf and transf_idx. The former, transf, is the transformed features in x while the second
         """
         transf = dict()
-        transf_idx = dict()
         for d in np.arange(1, self.kernel_d + 1):
-            d_idx = [[int(ch) for ch in idx.split(',')] for idx in self.idx_unique[self.idx_dim==d]]
+            d_idx = [[int(ch) for ch in idx.split(',')] for idx in self.get_dim_idx(d=d, mask=mask)]
             if reduce_memory:
                 sv_interaction = np.zeros((x.shape[0],len(d_idx)))
                 for ind, v in enumerate(x):
                     sv_interaction[ind,:] = np.squeeze(np.prod(v[d_idx], axis=1))
             else:
                 sv_interaction = np.squeeze(np.prod(x[:,d_idx], axis=2))
+            if len(sv_interaction.shape) == 1:
+                sv_interaction = np.reshape(sv_interaction, (1,sv_interaction.shape[0]))
+
             transf[d] = sv_interaction
-            transf_idx[d] = np.array(d_idx)
-        if to_array:
-            return self.dict2array(transf)
+        return transf
+
+    def get_dim_idx(self, d, mask=False) -> List[str]:
+        """
+        Returns index in self.idx_unique of dimension d.
+
+        :param d: Dimension to extract indexes from.
+        :param mask: Set to True to extract only indexes in self.mask of dimension d. Default False.
+        :return:
+        """
+        if mask:
+            if len(self.mask_idx)>0:
+                return [idx for idx in self.idx_unique[(self.idx_dim==d) & (self.mask_idx)]]
+            else:
+                raise ValueError("Instance variable mask is empty.")
         else:
-            return transf, transf_idx
+            return [idx for idx in self.idx_unique[self.idx_dim==d]]
 
     @classmethod
     def dict2array(cls, di) -> np.ndarray:
@@ -142,9 +162,9 @@ class ExPSVM:
         :param di: Dictionary to transform
         :return:
         """
-        return np.concatenate([*di.values()], axis=1)
+        return np.concatenate([*di.values()], axis=-1)
 
-    def dekernelize(self, reduce_memory: bool = False):
+    def dekernelize_model(self, reduce_memory: bool = False, mask: bool = False):
         """
         Calculate compressed linear version for SVM model with polynomial kernel.
         :param reduce_memory:
@@ -152,15 +172,43 @@ class ExPSVM:
         """
         if not ((self.idx_unique) and (self.perm_count)):
             self._multiplication_transform()
-        compressed_transform, _ = self._compress_transform(x=self.sv, reduce_memory=reduce_memory, to_array=False)
-
+        compressed_transform = self._compress_transform(x=self.sv, reduce_memory=reduce_memory, mask=mask)
         # Multiply by dual coefficients (alpha and labels), sum over support vectors, and scale with polynomial coefficient
         for d in compressed_transform.keys():
-            compressed_transform[d] = self.poly_coef[d]*np.sum(np.multiply(self.dual_coef, compressed_transform[d]), axis=0)
+            compressed_transform[d] = self.poly_coef[d]*(
+                np.sum(
+                    np.multiply(self.dual_coef,
+                                np.multiply(self.perm_count[self.idx_dim==d],
+                                            compressed_transform[d])),
+                    axis=0, keepdims=True))
 
         # Create linear model
-        print()
-        print(compressed_transform.values())
-        lin = np.concatenate(list(compressed_transform.values()))
-        print(lin)
-        print(lin.shape)
+
+        self.linear_model = self.dict2array(compressed_transform)
+
+    def feature_importance(self, n_components: int = None):
+        if n_components is None:
+            n_components = self.idx_unique.shape[0]
+
+    def polynomial_kernel(self, x: np.ndarray, y: np.ndarray):
+        if len(x.shape)==1:
+            x = x.reshape((1,-1))
+        if len(x.shape) > 2:
+            raise ValueError("x should be 2-dimensional. Shape of x is {}".format(x.shape))
+        if len(y.shape)==1:
+            y = y.reshape((1,-1))
+        if len(y.shape) > 2:
+            raise ValueError("y should be 2-dimensional. Shape of y is {}".format(y.shape))
+        return (self.kernel_r + np.sum(np.multiply(x, y), axis=1, keepdims=True))**self.kernel_d
+
+    def _linear_model_dot(self, x: np.ndarray, reduce_memory: bool = False, mask: bool = False):
+        if len(x.shape)==1:
+            x = x.reshape((1,-1))
+        if len(x.shape) > 2:
+            raise ValueError("x should be 2-dimensional. Shape of x is {}".format(x.shape))
+        x_transf = self.dict2array(self._compress_transform(x=x, reduce_memory=reduce_memory, mask=mask))
+
+        return np.transpose(np.matmul(self.linear_model, np.transpose(x_transf))) + self.kernel_r**self.kernel_d
+
+    def decision_function(self, x: np.ndarray, reduce_memory: bool = False, mask: bool = False):
+        return self.intercept + self._linear_model_dot(x=x, reduce_memory=reduce_memory, mask=mask)
