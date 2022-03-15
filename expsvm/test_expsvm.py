@@ -59,6 +59,12 @@ def std_transf_dict():
             2: np.array([[1., 2., 3., 4., 6., 9.],
                          [16., 20., 24., 25., 30., 36.]])}
 
+@pytest.fixture
+def std_lin_model():
+    # When using std_dual_coef with std_arr
+    return np.transpose(np.array([[19.2, 39, 58.8,
+                                   8.4, 36, 55.2, 37.5, 114, 86.4]]))
+
 
 @pytest.fixture
 def std_mask():
@@ -226,23 +232,21 @@ class TestExPSVM:
                         intercept=None)
         assert es.poly_coef == {1: 2, 2: 1}
 
-    def test_transform_svm(self, std_p, std_d, std_r, std_arr, std_dual_coef, mask=None):
-        true_lin_model = np.transpose(np.array([[19.2, 39, 58.8,
-                                                 8.4, 36, 55.2, 37.5, 114, 86.4]]))
+    def test_transform_svm(self, std_p, std_d, std_r, std_arr, std_dual_coef, std_lin_model, mask=None):
         es = exp.ExPSVM(sv=std_arr, dual_coeff=std_dual_coef,
                         kernel_d=std_d, kernel_r=std_r, p=std_p,
                         intercept=None)
 
         if mask is None:
             es.transform_svm()
-            assert np.all(es.linear_model == true_lin_model)
+            assert np.all(es.linear_model == std_lin_model)
         else:
             es.mask_idx = mask
             es.transform_svm(mask=True)
-            assert np.all(es.linear_model == true_lin_model[mask])
+            assert np.all(es.linear_model == std_lin_model[mask])
 
-    def test_transform_svm_mask(self, std_p, std_d, std_r, std_arr, std_mask, std_dual_coef):
-        self.test_transform_svm(std_p, std_d, std_r, std_arr, std_dual_coef, mask=std_mask)
+    def test_transform_svm_mask(self, std_p, std_d, std_r, std_arr, std_mask, std_dual_coef, std_lin_model):
+        self.test_transform_svm(std_p, std_d, std_r, std_arr, std_dual_coef, std_lin_model, mask=std_mask)
 
     def test_polynomial_kernel(self, std_p, std_d, std_r, std_arr):
         es = exp.ExPSVM(sv=None, dual_coeff=None,
@@ -254,46 +258,47 @@ class TestExPSVM:
         assert np.all(es.polynomial_kernel(std_arr, std_arr[0, :]) == np.array([[225], [1089]]))
         assert np.all(es.polynomial_kernel(std_arr[0, :], std_arr[0, :]) == np.array([[225]]))
 
-    def test_linear_model_dot(self, std_p, std_d, std_r, std_arr, std_mask):
-        """
-        Verify that the compressed linear model produce the same result as the polynomial kernel
+    # def test_linear_model_dot(self, std_p, std_d, std_r, std_arr, std_mask):
+    #     """
+    #     Verify that the compressed linear model produce the same result as the polynomial kernel
+    #
+    #     Author's note: It was at this test, that I, after more than 2 years of thinking, finally got to test that rewriting the polynomial kernel SVM as a compressed linear model which can be directly related to feature importance. Felt great when the test passed! So, Yay!
+    #     :return:
+    #     """
+    #     dual_coef = np.array([[1.]])  # Set to 1 to ignore effect of slack and class labels.
+    #     sv = std_arr[1:2, :]
+    #     es = exp.ExPSVM(sv=sv, dual_coeff=dual_coef,
+    #                     kernel_d=std_d, kernel_r=std_r, p=std_p,
+    #                     intercept=None)
+    #     es.transform_svm()
+    #     es.mask_idx = std_mask
+    #
+    #     arr1 = np.array([[4., 5, 6]])
+    #     arr2 = np.array([[4., 5, 6], [7., 8, 9]])
+    #     arr3 = np.random.randn(1, 3)
+    #
+    #     # Test with single observations
+    #     assert np.all(es._linear_model_dot(arr1, reduce_memory=False, mask=False) == es.polynomial_kernel(sv, arr1))
+    #
+    #     # Test with two observations
+    #     assert np.all(es._linear_model_dot(arr2, reduce_memory=False, mask=False) == es.polynomial_kernel(sv, arr2))
+    #
+    #     # Test that the two functions produce the same result within tolerance
+    #     tol = 1e-12
+    #     assert np.all(np.abs(
+    #         es._linear_model_dot(arr3, reduce_memory=False, mask=False) - es.polynomial_kernel(sv, arr3)) < tol)
+    #
+    #     # Test with reduced memory
+    #     assert np.all(es._linear_model_dot(arr2, reduce_memory=True, mask=False) == es.polynomial_kernel(sv, arr2))
+    #
+    #     # Test with mask
+    #     true_val = np.array([[(1 * sv[0, 0] ** 2) * (arr1[0, 0] ** 2) +
+    #                           (2 * sv[0, 0] * sv[0, 2]) * (arr1[0, 0] * arr1[0, 2]) +
+    #                           std_r ** std_d]])
+    #     assert np.all(es._linear_model_dot(arr1, reduce_memory=False, mask=True) == true_val)
 
-        Author's note: It was at this test, that I, after more than 2 years of thinking, finally got to test that rewriting the polynomial kernel SVM as a compressed linear model which can be directly related to feature importance. Felt great when the test passed! So, Yay!
-        :return:
-        """
-        dual_coef = np.array([[1.]])  # Set to 1 to ignore effect of slack and class labels.
-        sv = std_arr[1:2, :]
-        es = exp.ExPSVM(sv=sv, dual_coeff=dual_coef,
-                        kernel_d=std_d, kernel_r=std_r, p=std_p,
-                        intercept=None)
-        es.transform_svm()
-        es.mask_idx = std_mask
-
-        arr1 = np.array([[4., 5, 6]])
-        arr2 = np.array([[4., 5, 6], [7., 8, 9]])
-        arr3 = np.random.randn(1, 3)
-
-        # Test with single observations
-        assert np.all(es._linear_model_dot(arr1, reduce_memory=False, mask=False) == es.polynomial_kernel(sv, arr1))
-
-        # Test with two observations
-        assert np.all(es._linear_model_dot(arr2, reduce_memory=False, mask=False) == es.polynomial_kernel(sv, arr2))
-
-        # Test that the two functions produce the same result within tolerance
-        tol = 1e-12
-        assert np.all(np.abs(
-            es._linear_model_dot(arr3, reduce_memory=False, mask=False) - es.polynomial_kernel(sv, arr3)) < tol)
-
-        # Test with reduced memory
-        assert np.all(es._linear_model_dot(arr2, reduce_memory=True, mask=False) == es.polynomial_kernel(sv, arr2))
-
-        # Test with mask
-        true_val = np.array([[(1 * sv[0, 0] ** 2) * (arr1[0, 0] ** 2) +
-                              (2 * sv[0, 0] * sv[0, 2]) * (arr1[0, 0] * arr1[0, 2]) +
-                              std_r ** std_d]])
-        assert np.all(es._linear_model_dot(arr1, reduce_memory=False, mask=True) == true_val)
-
-    def test_decision_fun(self, std_p, std_d, std_r, std_arr, std_mask, std_intercept):
+    def test_decision_fun(self, std_p, std_d, std_r, std_arr, std_dual_coef, std_idx,
+                          std_mask, std_intercept, std_lin_model, std_transf_dict):
         """
         Verify that the decision function produce the correct values.
         """
@@ -303,10 +308,53 @@ class TestExPSVM:
                         kernel_d=std_d, kernel_r=std_r, p=std_p,
                         intercept=std_intercept)
         es.transform_svm()
-        arr = np.random.randn(1, 3)
         tol = 1e-12
-        assert np.all(np.abs(
-            es._linear_model_dot(arr) - es.polynomial_kernel(sv, arr)) < tol)
+
+        # Test single vector
+        arr = np.random.randn(1, 3)
+        assert np.abs(es.decision_function(arr) - (es.polynomial_kernel(sv, arr)+std_intercept)) < tol
+
+        # Test 2d array
+        arr = np.random.randn(2, 3)
+        assert np.all(np.abs(es.decision_function(arr) - (es.polynomial_kernel(sv, arr) + std_intercept)) < tol)
+
+        # Test 3d array. Should raise value error
+        arr = np.random.randn(2, 3, 1)
+        with pytest.raises(ValueError):
+            es.decision_function(arr)
+
+        # Test get components of the decision function
+        es = exp.ExPSVM(sv=std_arr, dual_coeff=std_dual_coef,
+                        kernel_d=std_d, kernel_r=std_r, p=std_p,
+                        intercept=std_intercept)
+        es.transform_svm()
+        const = std_r**std_d + std_intercept
+        true_components = np.multiply(es.dict2array(std_transf_dict), np.transpose(std_lin_model))
+        true_components = np.concatenate((np.array([[const], [const]]), true_components), axis=1)
+        true_feat = np.concatenate((np.array(['constant']), std_idx))
+        test_comp, test_feat = es.decision_function(std_arr, output_components=True)
+        assert np.all(test_comp == true_components)
+        assert np.all(test_feat == true_feat)
+
+        # Test components of decision function with mask
+        es.mask_idx = std_mask
+        es.transform_svm(mask=True)
+        const = std_r**std_d + std_intercept
+        true_components = np.multiply(es.dict2array(std_transf_dict), np.transpose(std_lin_model))
+        true_components = true_components[:, std_mask]
+        true_components = np.concatenate((np.array([[const], [const]]), true_components), axis=1)
+        true_feat = np.concatenate((np.array(['constant']), std_idx[std_mask]))
+        test_comp, test_feat = es.decision_function(std_arr, output_components=True, mask=True)
+        assert np.all(test_comp == true_components)
+        assert np.all(test_feat == true_feat)
+
+        # Test same as previous but don't use mask=True in es.decision_function.
+        # Function should realize that the linear model is already masked, so any
+        # calculation of the decision model should automatically use mask as well.
+        test_comp, test_feat = es.decision_function(std_arr, output_components=True)
+        assert np.all(test_comp == true_components)
+        assert np.all(test_feat == true_feat)
+
 
     def test_get_idx_unique(self, std_d, std_p, std_r, std_idx):
         es = exp.ExPSVM(sv=None, dual_coeff=None,
@@ -362,7 +410,8 @@ class TestExPSVM:
 
         # Test frac_feat_imp
         frac_feat_imp = 0.5
-        mask = es.feature_selection(frac_feat_imp=frac_feat_imp)
+        mask = es.feature_selection(frac_importance=frac_feat_imp)
         cs = np.cumsum(sorted_lm)/(np.cumsum(sorted_lm)[-1])
         assert np.all(set(es.linear_model[mask, 0]) == set(sorted_lm[cs < frac_feat_imp]))
 
+    # def test_set_mask

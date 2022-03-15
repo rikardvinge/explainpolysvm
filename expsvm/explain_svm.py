@@ -101,6 +101,7 @@ class ExPSVM:
         self.mask_idx = np.array([])
 
         self.linear_model = np.array([])
+        self.linear_model_is_masked: bool = False
 
     def get_idx_unique(self, **kwargs) -> np.ndarray:
         return self.idx_unique[self.get_dim_mask_index(**kwargs)]
@@ -112,7 +113,10 @@ class ExPSVM:
         return self.idx_dim[self.get_dim_mask_index(**kwargs)]
 
     def get_linear_model(self, **kwargs) -> np.ndarray:
-        return self.linear_model[self.get_dim_mask_index(**kwargs), :]
+        if self.linear_model_is_masked:
+            return self.linear_model
+        else:
+            return self.linear_model[self.get_dim_mask_index(**kwargs), :]
 
     def _multiplication_transform(self) -> None:
         """
@@ -150,23 +154,30 @@ class ExPSVM:
                 trans_dict[d] = np.array([])
         return trans_dict
 
-    def get_dim_mask_index(self, d: int = None, mask: bool = False) -> np.ndarray:
+    def get_dim_mask_index(self, idx_strs: List[str] = None, d: int = None, mask: bool = False) -> np.ndarray:
         """
         Returns index in transformed space of dimension d that are in mask.
 
+        :param idx_strs:
         :param d: Dimension to extract indexes from.
         :param mask: Set to True to extract only indexes in mask of dimension d. Default False.
         :return:
         """
-        if d is None:
-            ind = np.full(self.idx_unique.shape, True)
-        else:
-            ind = self.idx_dim == d
+
         if mask:
             if self.mask_idx.size > 0:
-                ind = ind & self.mask_idx
+                ind = self.mask_idx
             else:
                 raise ValueError("Instance variable mask is empty.")
+        else:
+            ind = np.full(self.idx_unique.shape, True)
+
+        if idx_strs is not None:
+            ind = ind & np.isin(self.get_idx_unique(), idx_strs)
+
+        if d is not None:
+            ind = ind & (self.idx_dim == d)
+
         return ind
 
     @classmethod
@@ -206,6 +217,8 @@ class ExPSVM:
 
         # Create linear model
         self.linear_model = np.expand_dims(self.dict2array(compressed_transform), axis=1)
+        if mask:
+            self.linear_model_is_masked = True
 
     def polynomial_kernel(self, x: np.ndarray, y: np.ndarray):
         if len(x.shape) == 1:
@@ -218,17 +231,22 @@ class ExPSVM:
             raise ValueError("y should be 2-dimensional. Shape of y is {}".format(y.shape))
         return (self.kernel_r + np.sum(np.multiply(x, y), axis=1, keepdims=True)) ** self.kernel_d
 
-    def _linear_model_dot(self, x: np.ndarray, reduce_memory: bool = False, mask: bool = False):
+    def decision_function(self, x: np.ndarray, output_components: bool = False, reduce_memory: bool = False,
+                          mask: bool = False):
         if len(x.shape) == 1:
             x = x.reshape((1, -1))
         if len(x.shape) > 2:
-            raise ValueError("x should be 2-dimensional. Shape of x is {}".format(x.shape))
-        x_trans = self.dict2array(self._compress_transform(x=x, reduce_memory=reduce_memory, mask=mask))
-        dot_prod = np.matmul(x_trans, self.get_linear_model(mask=mask))
-        return dot_prod + self.kernel_r ** self.kernel_d
-
-    def decision_function(self, x: np.ndarray, reduce_memory: bool = False, mask: bool = False):
-        return self.intercept + self._linear_model_dot(x=x, reduce_memory=reduce_memory, mask=mask)
+            raise ValueError("x should be 2-dimensional. Shape of x is {}.".format(x.shape))
+        use_mask = mask or self.linear_model_is_masked
+        x_trans = self.dict2array(self._compress_transform(x=x, reduce_memory=reduce_memory, mask=use_mask))
+        dot_prod = np.multiply(x_trans, np.transpose(self.get_linear_model()))
+        constant = self.kernel_r**self.kernel_d + self.intercept
+        if output_components:
+            dot_prod = np.concatenate((constant*np.ones((x.shape[0], 1)), dot_prod), axis=1)
+            feat = np.concatenate((['constant'], self.get_idx_unique(mask=use_mask)), axis=0)
+            return dot_prod, feat
+        else:
+            return constant + np.sum(dot_prod, axis=1, keepdims=True)
 
     def feature_importance(self, sort: bool = True, **kwargs):
         if sort:
@@ -241,12 +259,12 @@ class ExPSVM:
 
     def feature_selection(self, n_feat: int = None,
                           frac_feat: float = None,
-                          frac_feat_imp: float = None):
+                          frac_importance: float = None):
         """
 
         :param n_feat:
         :param frac_feat:
-        :param frac_feat_imp:
+        :param frac_importance:
         :return:
         """
 
@@ -260,24 +278,26 @@ class ExPSVM:
                 raise ValueError("frac_feat should be an integer in the range ]0,1]. Current value: {}"
                                  .format(frac_feat))
             n_feat = int(frac_feat*self.idx_unique.size)
-        elif frac_feat_imp is not None:
-            if (frac_feat_imp <= 0) or (frac_feat_imp > 1):
+        elif frac_importance is not None:
+            if (frac_importance <= 0) or (frac_importance > 1):
                 raise ValueError("frac_feat_imp should be an integer in the range ]0,1]. Current value: {}"
-                                 .format(frac_feat_imp))
+                                 .format(frac_importance))
             fi_csum = np.cumsum(feat_imp)
 
-            n_feat = int(np.sum((fi_csum/fi_csum[-1]) <= frac_feat_imp))
+            n_feat = int(np.sum((fi_csum/fi_csum[-1]) <= frac_importance))
 
         bool_mask = np.full((self.idx_unique.size,), False)
         bool_mask[sort_order[:n_feat]] = True
         return bool_mask
 
-    def set_mask(self, mask: np.ndarray = None, **kwargs):
+    def set_mask(self, mask: np.ndarray = None, mask_strs: List[str] = None, **kwargs):
         if mask is not None:
             if mask.dtype == bool:
                 self.mask_idx = mask
             else:
                 raise TypeError("mask should have dtype bool. Current type: {}".format(mask.dtype))
+        elif mask_strs:
+            if mask_strs is not None:
+                self.mask_idx = self.get_dim_mask_index(idx_strs=mask_strs)
         else:
             self.mask_idx = self.feature_selection(**kwargs)
-
