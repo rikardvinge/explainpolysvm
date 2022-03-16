@@ -73,24 +73,25 @@ class TensorUtil:
 
 class ExPSVM:
 
-    def __init__(self, sv: np.ndarray, dual_coeff: np.ndarray,
-                 intercept: float,
-                 kernel_d: int, kernel_r: float,
+    def __init__(self, sv: np.ndarray = None, dual_coef: np.ndarray = None,
+                 intercept: float = None,
+                 kernel_d: int = None, kernel_r: float = None, kernel_gamma: float = 1.,
                  p: int = None) -> None:
         # Number of features
         if p is None:
-            self.p = sv.shape[0]
+            self.p = sv.shape[1]
         else:
             self.p = p
 
         # SVM model
         self.sv = sv
-        self.dual_coef = np.reshape(dual_coeff, (-1, 1))
+        self.dual_coef = np.reshape(dual_coef, (-1, 1))
         self.intercept = intercept
 
         # Polynomial kernel parameters
         self.kernel_d = kernel_d
         self.kernel_r = kernel_r
+        self.kernel_gamma = kernel_gamma
 
         # Instantiate compressed polynomial SVM
         self.idx_unique = np.array([])
@@ -144,7 +145,8 @@ class ExPSVM:
                 if reduce_memory:
                     feat_trans = np.zeros((x.shape[0], len(d_idx)))
                     for ind, v in enumerate(x):
-                        feat_trans[ind, :] = np.squeeze(np.prod(np.expand_dims(v, axis=0)[:, d_idx], axis=2))
+                        feat_trans[ind, :] = (self.kernel_gamma**d) * \
+                                             np.squeeze(np.prod(np.expand_dims(v, axis=0)[:, d_idx], axis=2))
                 else:
                     feat_trans = np.squeeze(np.prod(x[:, d_idx], axis=2))
                 if len(feat_trans.shape) == 1:
@@ -193,7 +195,6 @@ class ExPSVM:
         :param di: Dictionary to transform
         :return: numpy.ndarray of shape n_sample-by-n_transformed_features-shaped.
         """
-        # return np.concatenate([*di.values()], axis=-1)
         return np.concatenate([*{key: val for key, val in di.items() if val.size > 0}.values()], axis=-1)
 
     def transform_svm(self, reduce_memory: bool = False, mask: bool = False):
@@ -229,24 +230,31 @@ class ExPSVM:
             y = y.reshape((1, -1))
         if len(y.shape) > 2:
             raise ValueError("y should be 2-dimensional. Shape of y is {}".format(y.shape))
-        return (self.kernel_r + np.sum(np.multiply(x, y), axis=1, keepdims=True)) ** self.kernel_d
+        return (self.kernel_r + np.sum(np.multiply(x, y), axis=1, keepdims=False)) ** self.kernel_d
 
-    def decision_function(self, x: np.ndarray, output_components: bool = False, reduce_memory: bool = False,
-                          mask: bool = False):
+    def decision_function_components(self, x: np.ndarray, output_feat_names: bool = False,
+                                     reduce_memory: bool = False, mask: bool = False):
         if len(x.shape) == 1:
             x = x.reshape((1, -1))
         if len(x.shape) > 2:
             raise ValueError("x should be 2-dimensional. Shape of x is {}.".format(x.shape))
         use_mask = mask or self.linear_model_is_masked
         x_trans = self.dict2array(self._compress_transform(x=x, reduce_memory=reduce_memory, mask=use_mask))
+
         dot_prod = np.multiply(x_trans, np.transpose(self.get_linear_model()))
-        constant = self.kernel_r**self.kernel_d + self.intercept
-        if output_components:
-            dot_prod = np.concatenate((constant*np.ones((x.shape[0], 1)), dot_prod), axis=1)
+        constant = self.kernel_r ** self.kernel_d + self.intercept
+
+        dot_prod = np.concatenate((constant * np.ones((x.shape[0], 1)), dot_prod), axis=1)
+        if output_feat_names:
             feat = np.concatenate((['constant'], self.get_idx_unique(mask=use_mask)), axis=0)
             return dot_prod, feat
         else:
-            return constant + np.sum(dot_prod, axis=1, keepdims=True)
+            return dot_prod
+
+    def decision_function(self, x: np.ndarray, reduce_memory: bool = False, mask: bool = False):
+        dot_prod = self.decision_function_components(x=x, output_feat_names=False,
+                                                     reduce_memory=reduce_memory, mask=mask)
+        return np.sum(dot_prod, axis=1, keepdims=False)
 
     def feature_importance(self, sort: bool = True, **kwargs):
         if sort:
@@ -277,14 +285,14 @@ class ExPSVM:
             if (frac_feat <= 0) or (frac_feat > 1):
                 raise ValueError("frac_feat should be an integer in the range ]0,1]. Current value: {}"
                                  .format(frac_feat))
-            n_feat = int(frac_feat*self.idx_unique.size)
+            n_feat = int(frac_feat * self.idx_unique.size)
         elif frac_importance is not None:
             if (frac_importance <= 0) or (frac_importance > 1):
                 raise ValueError("frac_feat_imp should be an integer in the range ]0,1]. Current value: {}"
                                  .format(frac_importance))
             fi_csum = np.cumsum(feat_imp)
 
-            n_feat = int(np.sum((fi_csum/fi_csum[-1]) <= frac_importance))
+            n_feat = int(np.sum((fi_csum / fi_csum[-1]) <= frac_importance))
 
         bool_mask = np.full((self.idx_unique.size,), False)
         bool_mask[sort_order[:n_feat]] = True
