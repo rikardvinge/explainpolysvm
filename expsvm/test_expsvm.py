@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 from expsvm import explain_svm as exp
-from sklearn.datasets import load_breast_cancer
+from sklearn.datasets import load_breast_cancer, make_classification
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 from sklearn.model_selection import train_test_split
@@ -21,9 +21,11 @@ def std_d():
 def std_r():
     return 1.
 
+
 @pytest.fixture
 def std_gamma():
     return 1.
+
 
 @pytest.fixture
 def std_intercept():
@@ -78,6 +80,17 @@ def std_lin_model():
 def std_mask():
     return np.array([False, False, False,
                      True, False, True, False, False, False])
+
+
+def create_sklearn_expsvm_models(X_train, y_train, C, degree, gamma, r) -> (SVC, exp.ExPSVM):
+    # Fit SVM
+    kernel = 'poly'
+    model = SVC(C=C, kernel=kernel, degree=degree, gamma=gamma, coef0=r)
+    model.fit(X_train, y_train)
+
+    es = exp.ExPSVM(svc_model=model)
+    es.transform_svm()
+    return model, es
 
 
 class TestExPSVM:
@@ -229,7 +242,8 @@ class TestExPSVM:
             assert np.all(trans[dim] == true_array[dim])
 
     def test_compressed_transform_memory(self, std_p, std_d, std_r, std_gamma, std_transf_dict, std_arr):
-        self.test_compressed_transform(std_p, std_d, std_r, std_gamma, std_transf_dict, std_arr, reduce_memory=True, mask=None)
+        self.test_compressed_transform(std_p, std_d, std_r, std_gamma, std_transf_dict, std_arr, reduce_memory=True,
+                                       mask=None)
 
     def test_compressed_transform_mask(self, std_p, std_d, std_r, std_gamma, std_transf_dict, std_arr, std_mask):
         true_array = {1: np.array([]), 2: np.array([[1, 3], [16, 24]])}
@@ -292,13 +306,19 @@ class TestExPSVM:
         es.transform_svm()
         tol = 1e-12
 
+        # When comparing the decision function between the polynomial kernel and
+        # our decision function, we should add the SVM intercept and subtract
+        # r^d. The latter term comes from the kernel expansion but is removed due
+        # due to the KKT conditions.
+        constant = std_intercept - std_r ** std_d
+
         # Test single vector
         arr = np.random.randn(1, 3)
-        assert np.abs(es.decision_function(arr) - (es.polynomial_kernel(sv, arr)+std_intercept)) < tol
+        assert np.abs(es.decision_function(arr) - (es.polynomial_kernel(sv, arr) + constant)) < tol
 
         # Test 2d array
         arr = np.random.randn(2, 3)
-        assert np.all(np.abs(es.decision_function(arr) - (es.polynomial_kernel(sv, arr) + std_intercept)) < tol)
+        assert np.all(np.abs(es.decision_function(arr) - (es.polynomial_kernel(sv, arr) + constant)) < tol)
 
         # Test 3d array. Should raise value error
         arr = np.random.randn(2, 3, 1)
@@ -314,7 +334,9 @@ class TestExPSVM:
                         kernel_d=std_d, kernel_r=std_r, kernel_gamma=std_gamma,
                         p=std_p, intercept=std_intercept)
         es.transform_svm()
-        const = std_r**std_d + std_intercept
+        # const = std_r**std_d + std_intercept
+        const = std_intercept
+
         true_components = np.multiply(es.dict2array(std_transf_dict), np.transpose(std_lin_model))
         true_components = np.concatenate((np.array([[const], [const]]), true_components), axis=1)
         true_feat = np.concatenate((np.array(['constant']), std_idx))
@@ -325,7 +347,6 @@ class TestExPSVM:
         # Test components of decision function with mask
         es.mask_idx = std_mask
         es.transform_svm(mask=True)
-        const = std_r**std_d + std_intercept
         true_components = np.multiply(es.dict2array(std_transf_dict), np.transpose(std_lin_model))
         true_components = true_components[:, std_mask]
         true_components = np.concatenate((np.array([[const], [const]]), true_components), axis=1)
@@ -395,7 +416,7 @@ class TestExPSVM:
         # Test frac_feat_imp
         frac_feat_imp = 0.5
         mask = es.feature_selection(frac_importance=frac_feat_imp)
-        cs = np.cumsum(sorted_lm)/(np.cumsum(sorted_lm)[-1])
+        cs = np.cumsum(sorted_lm) / (np.cumsum(sorted_lm)[-1])
         assert np.all(set(es.linear_model[mask, 0]) == set(sorted_lm[cs < frac_feat_imp]))
 
     def test_set_mask(self, std_arr, std_dual_coef, std_d, std_gamma,
@@ -434,38 +455,115 @@ class TestExPSVM:
         cs = np.cumsum(sorted_lm) / (np.cumsum(sorted_lm)[-1])
         assert np.all(set(es.linear_model[mask, 0]) == set(sorted_lm[cs < frac_feat_imp]))
 
-    def test_compare_sklearn_svc(self, std_d, std_r, std_gamma):
-        X, y = load_breast_cancer(return_X_y=True)
-        # X = data['data']
-        # y = data['target']
+    def test_compare_sklearn_svc_artificial_data_2d(self):
+        n_train_per_class = 100
 
-        # Split in training and test sets. Used to test decision function equality
+        # Radii for rings
+        r_min1 = 0.
+        r_max1 = 1.
+        r_min2 = 1.
+        r_max2 = 1.41
+
+        # Sample from classes
+        phi_train1 = 2 * np.pi * np.random.rand(n_train_per_class)
+        r_train1 = r_min1 + (r_max1 - r_min1) * np.random.rand(n_train_per_class, 1)
+        X_train1 = np.multiply(r_train1, np.transpose(np.array((np.cos(phi_train1), np.sin(phi_train1)))))
+
+        phi_train2 = 2 * np.pi * np.random.rand(n_train_per_class)
+        r_train2 = r_min2 + (r_max2 - r_min2) * np.random.rand(n_train_per_class, 1)
+        X_train2 = np.multiply(r_train2, np.transpose(np.array((np.cos(phi_train2), np.sin(phi_train2)))))
+
+        X = np.concatenate((X_train1, X_train2), axis=0)
+        y = np.concatenate((np.ones(n_train_per_class), -np.ones(n_train_per_class)))
+
         X_train, X_test, y_train, y_test = train_test_split(X, y,
                                                             test_size=10, random_state=10)
+        # Fit SVM
+        C = 0.9
+        degree = 2
+        gamma = 1. / np.pi
+        r = np.sqrt(2)
 
-        # Standardize
-        ssc = StandardScaler()
-        X_train = ssc.fit_transform(X_train)
-        X_test = ssc.transform(X_test)
-
-        # Train SVM with polynomial kernel
-        model = SVC(kernel='poly', degree=std_d, gamma=std_gamma, coef0=std_r)
+        # Fit SVM
+        kernel = 'poly'
+        model = SVC(C=C, kernel=kernel, degree=degree, gamma=gamma, coef0=r)
         model.fit(X_train, y_train)
 
-        # Extract model parameters
         sv = model.support_vectors_
         dual_coef = np.squeeze(model.dual_coef_)
         intercept = model.intercept_[0]
+        kernel_gamma = model._gamma
+
         es = exp.ExPSVM(sv=sv, dual_coef=dual_coef, intercept=intercept,
-                        kernel_d=std_d, kernel_r=std_r, kernel_gamma=std_gamma)
+                        kernel_d=degree, kernel_r=r, kernel_gamma=kernel_gamma)
         es.transform_svm()
 
-        print()
-        print(intercept)
-        # print(sv.shape)
-        # print(dual_coef)
         sklearn_df = model.decision_function(X_test)
         expsvm_df = es.decision_function(X_test)
         tol = 1e-10
         assert np.all(np.abs(expsvm_df - sklearn_df) < tol)
 
+    def test_compare_sklearn_svc_artificial_data_7d(self):
+        n_samples = 1000
+        n_features = 7
+        n_informative = 5
+        n_redundant = 2
+        n_repeated = 0
+        n_classes = 2
+        n_clusters_per_class = 3
+        X, y = make_classification(n_samples=n_samples, n_features=n_features,
+                                   n_informative=n_informative, n_redundant=n_redundant,
+                                   n_repeated=n_repeated, n_classes=n_classes,
+                                   n_clusters_per_class=n_clusters_per_class)
+        y[y == 0] = -1
+
+        X_train, X_test, y_train, y_test = train_test_split(X, y,
+                                                            test_size=100, random_state=10)
+        # Standardize data
+        sc = StandardScaler()
+        sc.fit(X_train)
+        X_train = sc.transform(X_train)
+        X_test = sc.transform(X_test)
+
+        # Fit SVM
+        C = 0.9
+        degree = 3
+        gamma = 'auto'
+        r = np.sqrt(2)
+
+        # Fit SVM
+        kernel = 'poly'
+        model = SVC(C=C, kernel=kernel, degree=degree, gamma=gamma, coef0=r)
+        model.fit(X_train, y_train)
+
+        es = exp.ExPSVM(svc_model=model)
+
+        es.transform_svm()
+        sklearn_df = model.decision_function(X_test)
+        expsvm_df = es.decision_function(X_test)
+        tol = 1e-10
+        assert np.all(np.abs(expsvm_df - sklearn_df) < tol)
+
+    def test_compare_sklearn_svc_breast_cancer(self):
+        X, y = load_breast_cancer(return_X_y=True)
+        y[y == 0] = -1
+        # Split in training and test sets. Used to test decision function equality
+        X_train, X_test, y_train, y_test = train_test_split(X, y,
+                                                            test_size=20, random_state=10)
+
+        # Standardize
+        sc = StandardScaler()
+        sc.fit(X_train)
+        X_train = sc.transform(X_train)
+        X_test = sc.transform(X_test)
+
+        # Fit SVM
+        C = 1.0
+        degree = 3
+        gamma = 'scale'
+        r = np.sqrt(2)
+        model, es = create_sklearn_expsvm_models(X_train, y_train, C, degree, gamma, r)
+        sklearn_df = model.decision_function(X_test)
+        expsvm_df = es.decision_function(X_test)
+        tol = 1e-10
+        assert np.all(np.abs(expsvm_df - sklearn_df) < tol)

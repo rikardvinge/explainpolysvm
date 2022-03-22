@@ -2,6 +2,7 @@ from math import comb
 import numpy as np
 import itertools as it
 from typing import List
+from sklearn.svm import SVC
 
 
 class TensorUtil:
@@ -27,10 +28,15 @@ class TensorUtil:
         counts_unique = set()
         elem_counts = []
         for elem in idx_list:
-            idx_set = set(elem.split(','))
+            # Convert string to list of int.
+            # This is to ensure we count, for example, '1,11' as one 1 and one 11, not three 1s and one 11.
+            idx_list = [int(idx) for idx in elem.split(',')]
+            idx_set = set(idx_list)
+
+            # Count occurrences of each index
             counts = []
             for idx in idx_set:
-                count = elem.count(idx)
+                count = idx_list.count(idx)
                 counts.append(count)
             counts.sort()
             counts = ','.join([str(sorted_count) for sorted_count in counts])
@@ -73,25 +79,37 @@ class TensorUtil:
 
 class ExPSVM:
 
-    def __init__(self, sv: np.ndarray = None, dual_coef: np.ndarray = None,
+    def __init__(self, svc_model: SVC = None, sv: np.ndarray = None, dual_coef: np.ndarray = None,
                  intercept: float = None,
-                 kernel_d: int = None, kernel_r: float = None, kernel_gamma: float = 1.,
+                 kernel_d: int = None, kernel_r: float = None, kernel_gamma: float = None,
                  p: int = None) -> None:
-        # Number of features
-        if p is None:
-            self.p = sv.shape[1]
+        if svc_model is not None:
+            if svc_model.classes_.size != 2:
+                raise ValueError("Number of classes should be 2. "
+                                 "Current number of classes: {}.".format(svc_model.classes_.size))
+            self.sv = svc_model.support_vectors_
+            self.p = svc_model.n_features_in_
+            self.dual_coef = np.reshape(svc_model.dual_coef_, (-1, 1))
+            self.intercept = svc_model.intercept_[0]
+            self.kernel_d = svc_model.degree
+            self.kernel_r = svc_model.coef0
+            self.kernel_gamma = svc_model._gamma
         else:
-            self.p = p
+            # Number of features
+            if p is None:
+                self.p = sv.shape[1]
+            else:
+                self.p = p
 
-        # SVM model
-        self.sv = sv
-        self.dual_coef = np.reshape(dual_coef, (-1, 1))
-        self.intercept = intercept
+            # SVM model
+            self.sv = sv
+            self.dual_coef = np.reshape(dual_coef, (-1, 1))
+            self.intercept = intercept
 
-        # Polynomial kernel parameters
-        self.kernel_d = kernel_d
-        self.kernel_r = kernel_r
-        self.kernel_gamma = kernel_gamma
+            # Polynomial kernel parameters
+            self.kernel_d = kernel_d
+            self.kernel_r = kernel_r
+            self.kernel_gamma = kernel_gamma
 
         # Instantiate compressed polynomial SVM
         self.idx_unique = np.array([])
@@ -145,8 +163,7 @@ class ExPSVM:
                 if reduce_memory:
                     feat_trans = np.zeros((x.shape[0], len(d_idx)))
                     for ind, v in enumerate(x):
-                        feat_trans[ind, :] = (self.kernel_gamma**d) * \
-                                             np.squeeze(np.prod(np.expand_dims(v, axis=0)[:, d_idx], axis=2))
+                        feat_trans[ind, :] = np.squeeze(np.prod(np.expand_dims(v, axis=0)[:, d_idx], axis=2))
                 else:
                     feat_trans = np.squeeze(np.prod(x[:, d_idx], axis=2))
                 if len(feat_trans.shape) == 1:
@@ -211,7 +228,7 @@ class ExPSVM:
         # Multiply by dual coefficients, sum over support vectors, and scale with polynomial coefficient
         for d in compressed_transform.keys():
             if compressed_transform[d].size > 0:
-                compressed_transform[d] = self.poly_coef[d] * (
+                compressed_transform[d] = self.poly_coef[d] * (self.kernel_gamma**d) * (
                     np.sum(np.multiply(self.dual_coef,
                                        np.multiply(self.get_perm_count(d=d, mask=mask), compressed_transform[d])),
                            axis=0, keepdims=False))
@@ -242,7 +259,7 @@ class ExPSVM:
         x_trans = self.dict2array(self._compress_transform(x=x, reduce_memory=reduce_memory, mask=use_mask))
 
         dot_prod = np.multiply(x_trans, np.transpose(self.get_linear_model()))
-        constant = self.kernel_r ** self.kernel_d + self.intercept
+        constant = self.intercept
 
         dot_prod = np.concatenate((constant * np.ones((x.shape[0], 1)), dot_prod), axis=1)
         if output_feat_names:
