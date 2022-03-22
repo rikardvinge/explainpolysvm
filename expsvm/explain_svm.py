@@ -13,6 +13,13 @@ class TensorUtil:
     def create_unique_index(self) -> List[str]:
         """
         Create set of tensor indexes where the order of the indexes does not matter.
+        That is, the tensor is symmetric such that the elements at index (i,j,k,l) and
+        (i,k,j,l) are identical for any number of indices and tensor rank.
+
+        :return: List[str]. List of strings containing indices formatted as 'i,j,k,l,...'
+        where i,j,k,l,...= 1..p where p is the dimension of the tensor and the number of
+        indices i,j,k,l is equal to the tensor dimension. Note that multiple of i,j,k,l,...
+        can take the same values.
         """
         list_idx = list(it.combinations_with_replacement(np.arange(self.dim), self.rank))
         return [','.join([str(idx) for idx in tup]) for tup in list_idx]
@@ -20,10 +27,14 @@ class TensorUtil:
     @classmethod
     def _count_index_occurrences(cls, idx_list):
         """
-        Count the number of occurrences of each index, e.g. the element (0,0,1,2,3) has occurrences {2,1,1,1,0}
-        corresponding to two 0s, one 1, one 2, one 3 and zero 4. The 4 ins included since this is the highest possible
-        index in this tensor.
-        Also, map each occurrence list to a label.
+        Count the number of occurrences of each index.
+         For example, the element (0,0,1,2,3) has occurrences 2,1,1,1,0.
+        corresponding to two 0s, one 1, one 2, one 3 and zero 4. The 4 ins included since this
+        is the highest possible index in this tensor.
+
+        :param idx_list: List[str]. List of strings with tensor indexes.
+        :return elem_list: List[int]. Count of number of permutations for each index in idx_list.
+        :return counts_unique: List[int]. Unique elements of elem_list.
         """
         counts_unique = set()
         elem_counts = []
@@ -38,6 +49,7 @@ class TensorUtil:
             for idx in idx_set:
                 count = idx_list.count(idx)
                 counts.append(count)
+            # Store counts as sorted string separated with comma. Sorted with lowest number of occurrences first.
             counts.sort()
             counts = ','.join([str(sorted_count) for sorted_count in counts])
             counts_unique.add(counts)
@@ -45,6 +57,11 @@ class TensorUtil:
         return elem_counts, list(counts_unique)
 
     def n_perm(self) -> (List[str], List[int]):
+        """
+        List unique tensor indices and the number of permutations for each index.
+        :return idx_unique: List[str]. List of unique tensor indices given permutation symmetry of the indexes.
+        :return idx_n_perm: List[int]. List of counts of permutation for each index in idx_unique.
+        """
         idx_unique = self.create_unique_index()
         count_strs, count_strs_unique = self._count_index_occurrences(idx_unique)
         # Map number of permutations to each unique index in idx_unique.
@@ -65,7 +82,7 @@ class TensorUtil:
         Rank of tensor is 5=2+1+1+1, i.e. the number of occurences of i,j,k,l.
 
         :param count_str: String of occurrences of each index.
-        :return: int. Number of possible permutations
+        :return n_perm: int. Number of possible permutations
         """
         counts_list = [int(ch) for ch in count_str.split(',') if int(ch) > 1]
         if len(counts_list) == 0:
@@ -73,26 +90,112 @@ class TensorUtil:
         else:
             perm_reduction = np.prod([np.math.factorial(count) for count in counts_list])
         n_perm = int(np.math.factorial(self.rank) / perm_reduction)
-
         return n_perm
 
 
 class ExPSVM:
+    """
+        Explain polynomial SVM.
 
-    def __init__(self, svc_model: SVC = None, sv: np.ndarray = None, dual_coef: np.ndarray = None,
+        Transformed a trained SVM model into a linear model where each term in the model corresponds
+        to an interaction between the original features. The model assumes the SVM is trained with
+        a polynomial kernel defined as
+        K(x,y|d,r,gamma) = (r + gamma*(x^Ty))^d.
+        Here, r is the constant term of the polynomial kernel, d the polynomial degree, gamma
+        a kernel coefficient determining the relative weight of higher components, and x and y feature vectors.
+
+        The transformation to a linear kernel makes use of the fact that interactions containing the exact same
+        constituents, all have the same value. For example, the interaction x1*x1*x3*x5, that is, feature 1 multiplied
+        by itself as well as feature 3 and 5, is equal to X1*x3*x5*x1. Thus, we only need to calculate one of these
+        interactions. In the linear model, the total contribution from this interaction is calculated from the
+        value of one of the interaction multiplied by the number of identical interactions.
+
+        Parameters
+        ----------
+        sv : numpy.ndarray of shape (n_SV, n_features)
+            Support vectors. Optional, use only if no scikit-learn model is provided.
+
+        p: int
+            Number of features in original space. Calculated from sv.shape if not provided.
+            Optional, use only if no scikit-learn model is provided.
+
+        dual_coef: numpy.ndarray of shape (n_SV, 1)
+            SVM dual coefficients. Same as dual_coef_ in sklearn's SVC. Calculated as dual_coef[i] = alpha[i]*y[i].
+            Optional, use only if no scikit-learn model is provided.
+
+        intercept: float
+            The constant in the SVM decision function. Optional, use only if no scikit-learn model is provided.
+
+        kernel_d: int
+            Degree of the polynomial kernel. Optional, use only if no scikit-learn model is provided.
+
+        kernel_r: float
+            Independent term of the polynomial kernel. Optional, use only if no scikit-learn model is provided.
+
+        kernel_gamma: float or {'scale', 'auto'}
+            Kernel coefficient controlling the relative importance of higher-order terms.
+            Optional, use only if no scikit-learn model is provided.
+
+        svc_model: sklearn.svm.SVC
+            Trained Scikit-learn SVC model. Use to simplify creation of ExPSVM object.
+            Parameters are extracted automatically from the SVC object.
+
+        Attributes
+        ----------
+
+        idx_unique: numpy.ndarray of str of shape (n_transform,)
+            List of unique indices that are explicitly included in the linear tranformations. Formatted as
+            ['i,j,k,l', 'i,i,k,l',...], for example. n_transform is the number of explicit interactions
+            in the linear model.
+
+        perm_count: numpy.ndarray of int of shape (n_transform,)
+            List of number of permutations of each index in idx_unique.
+
+        idx_dim: numpy.ndarray of int of shape (n_transform,)
+            List of dimensionality of each interaction in idx_unique. Fo example, interaction x1*x2*x3
+            has dimensionality 3.
+
+        poly_coef: dict
+            Dict containing constants relating to the dimensionality of the interaction, i.e. different constant for
+            first order interactions compared to second order interactions.
+            Calculated as (kernel_d choose d)*r^(kernel_d - d) where d is the dimensionality of the interaction.
+
+        mask_idx: numpy.ndarray of bool of shape (n_transform,)
+            Boolean array with True for every element that should be kept in the linear transformation.
+            The mask is used to select the most important features and reduce the size of the linear model.
+
+        linear_model: numpy.ndarray of float of shape (n_transform, 1)
+            Linear model transformed from the polynomial SVM model. Used to extract feature importance
+            and calculate the decision function.
+
+        linear_model_is_masked: bool
+            Flag to propagate the information that the linear_model has already been masked and does not
+            contain all interactions. Used when calculating the decision function and the feature importance
+            when evaluated on individual observations.
+        """
+
+    def __init__(self, sv: np.ndarray = None, dual_coef: np.ndarray = None,
                  intercept: float = None,
                  kernel_d: int = None, kernel_r: float = None, kernel_gamma: float = None,
-                 p: int = None) -> None:
+                 p: int = None, svc_model: SVC = None) -> None:
+
         if svc_model is not None:
             if svc_model.classes_.size != 2:
                 raise ValueError("Number of classes should be 2. "
                                  "Current number of classes: {}.".format(svc_model.classes_.size))
+            # Support vectors
             self.sv = svc_model.support_vectors_
+            # Number of features in original space
             self.p = svc_model.n_features_in_
+            # SVM dual coefficients, equal to alpha_i*y_i in standard SVM formulation.
             self.dual_coef = np.reshape(svc_model.dual_coef_, (-1, 1))
+            # SVM intercept
             self.intercept = svc_model.intercept_[0]
+            # Polynomial degree of kernel
             self.kernel_d = svc_model.degree
+            # Constant term in kernel
             self.kernel_r = svc_model.coef0
+            # Scale in polynomial kernel
             self.kernel_gamma = svc_model._gamma
         else:
             # Number of features
