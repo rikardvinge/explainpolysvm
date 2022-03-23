@@ -1,11 +1,31 @@
 from math import comb
 import numpy as np
 import itertools as it
-from typing import List
+from typing import List, Tuple
 from sklearn.svm import SVC
 
 
 class TensorUtil:
+    """
+    Tensor utilities.
+
+    Helper class to handle tensor operations.
+
+    The tensors are assumed to be permutation symmetric, i.e. to elements with indices that are permutations of each
+    other are equal. The tensors are also assumed to have the same number of elements in each dimension.
+
+    For example: The values at locations (i,i,k), (i,k,i) and (k,i,i) are all assumed to be identical.
+
+    This type of tensors occur any time a vector is multiplied by itself but along different dimensions, e.g. x*x^T.
+
+    Parameters
+    ----------
+    rank : int
+        Rank of tensor.
+    dim : int
+        Dimension of each component of the tensor.
+
+    """
     def __init__(self, rank: int, dim: int) -> None:
         self.rank = rank
         self.dim = dim
@@ -16,28 +36,39 @@ class TensorUtil:
         That is, the tensor is symmetric such that the elements at index (i,j,k,l) and
         (i,k,j,l) are identical for any number of indices and tensor rank.
 
-        :return: List[str]. List of strings containing indices formatted as 'i,j,k,l,...'
-        where i,j,k,l,...= 1..p where p is the dimension of the tensor and the number of
-        indices i,j,k,l is equal to the tensor dimension. Note that multiple of i,j,k,l,...
-        can take the same values.
+        :return: List[str].
+
+        Returns
+        -------
+        idx_strs : List[str]
+            List of indices of unique elements in a tensor with symmetry such that the value at permuted locations are
+            equal.
         """
         list_idx = list(it.combinations_with_replacement(np.arange(self.dim), self.rank))
         return [','.join([str(idx) for idx in tup]) for tup in list_idx]
 
     @classmethod
-    def _count_index_occurrences(cls, idx_list):
+    def _count_index_occurrences(cls, idx_list) -> Tuple[List[str], List[str]]:
         """
         Count the number of occurrences of each index.
          For example, the element (0,0,1,2,3) has occurrences 2,1,1,1,0.
         corresponding to two 0s, one 1, one 2, one 3 and zero 4. The 4 ins included since this
         is the highest possible index in this tensor.
 
-        :param idx_list: List[str]. List of strings with tensor indexes.
-        :return elem_list: List[int]. Count of number of permutations for each index in idx_list.
-        :return counts_unique: List[int]. Unique elements of elem_list.
+        Parameters
+        ----------
+        idx_list : List[str].
+            List of strings with tensor indexes.
+
+        Returns
+        -------
+        occurrences_counts : List[str]
+            Count of number of occurrences for each index in idx_list.
+        occurrences_counts : List[str]
+            Unique elements of elem_list.
         """
-        counts_unique = set()
-        elem_counts = []
+        occurrences_count_unique = set()
+        occurrences_counts = []
         for elem in idx_list:
             # Convert string to list of int.
             # This is to ensure we count, for example, '1,11' as one 1 and one 11, not three 1s and one 11.
@@ -49,30 +80,37 @@ class TensorUtil:
             for idx in idx_set:
                 count = idx_list.count(idx)
                 counts.append(count)
-            # Store counts as sorted string separated with comma. Sorted with lowest number of occurrences first.
+            # Store counts as sorted string separated with comma. Sorted with smallest number of occurrences first.
             counts.sort()
-            counts = ','.join([str(sorted_count) for sorted_count in counts])
-            counts_unique.add(counts)
-            elem_counts.append(counts)
-        return elem_counts, list(counts_unique)
+            # Convert to string and join with separating comma.
+            counts = ','.join([str(count) for count in counts])
+            occurrences_count_unique.add(counts)
+            occurrences_counts.append(counts)
+        return occurrences_counts, list(occurrences_count_unique)
 
-    def n_perm(self) -> (List[str], List[int]):
+    def n_perm(self) -> Tuple[List[str], List[int]]:
         """
         List unique tensor indices and the number of permutations for each index.
-        :return idx_unique: List[str]. List of unique tensor indices given permutation symmetry of the indexes.
-        :return idx_n_perm: List[int]. List of counts of permutation for each index in idx_unique.
+
+        Returns
+        -------
+        interactions : List[str]
+            List of unique tensor indices given permutation symmetry of the indexes.
+        perm_count : List[str]
+            List of counts of permutation for each index in interactions.
         """
-        idx_unique = self.create_unique_index()
-        count_strs, count_strs_unique = self._count_index_occurrences(idx_unique)
-        # Map number of permutations to each unique index in idx_unique.
+        interactions = self.create_unique_index()
+        count_strs, count_strs_unique = self._count_index_occurrences(interactions)
+        # Map number of permutations to each unique index in interactions.
         perm_count_dict = {count_str: self._count_perm(count_str) for count_str in count_strs_unique}
-        idx_n_perm = list(map(perm_count_dict.get, count_strs))
-        return idx_unique, idx_n_perm
+        perm_count = list(map(perm_count_dict.get, count_strs))
+        return interactions, perm_count
 
     def _count_perm(self, count_str: str) -> int:
         """
         Calculate number of symmetries from a string formatted as 'xyz...' where x is the number of occurrences of the
         first index, y is the number of occurrences of the second index, etc.
+
         Example:
         A tensor element is located at (i,j,i,k,l). The number of permutations, e.g. (i,i,j,k,l),
         is then 5!/(2!)=60
@@ -81,8 +119,15 @@ class TensorUtil:
         The reduction is 2!, from the number of possible ways we can interchange the two identical indexes.
         Rank of tensor is 5=2+1+1+1, i.e. the number of occurences of i,j,k,l.
 
-        :param count_str: String of occurrences of each index.
-        :return n_perm: int. Number of possible permutations
+        Parameters
+        ----------
+        count_str : str
+            String of occurrences of each index in a tensor.
+
+        Returns
+        -------
+        n_perm : int
+            Number of permutations of the indices in count_str.
         """
         counts_list = [int(ch) for ch in count_str.split(',') if int(ch) > 1]
         if len(counts_list) == 0:
@@ -91,6 +136,28 @@ class TensorUtil:
             perm_reduction = np.prod([np.math.factorial(count) for count in counts_list])
         n_perm = int(np.math.factorial(self.rank) / perm_reduction)
         return n_perm
+
+
+def dict2array(di) -> np.ndarray:
+    """
+    Flatten dict to array. Dict is assumed to have structure {1:array_1, 2:array_2,...} where array_x are 2d
+    arrays where rows are assumed belonging together.
+
+    Example: The array
+    {1:np.array([[1, 2, 3], [1, 2, 3]]),2:np.array([[1, 2, 3, 4, 6, 9], [1, 2, 3, 4, 6, 9]])}
+    is returned as [[1, 2, 3, 1, 2, 3, 4, 6, 9], [1, 2, 3, 1, 2, 3, 4, 6, 9]]
+
+    Parameters
+    ----------
+    di : dict
+        Dictionary to transform
+
+    Returns
+    -------
+    Array : Numpy ndarray
+        Concatenated arrays in the dict. Concatenated along axis 1.
+    """
+    return np.concatenate([*{key: val for key, val in di.items() if val.size > 0}.values()], axis=-1)
 
 
 class ExPSVM:
@@ -115,60 +182,59 @@ class ExPSVM:
         sv : numpy.ndarray of shape (n_SV, n_features)
             Support vectors. Optional, use only if no scikit-learn model is provided.
 
-        p: int
+        p : int
             Number of features in original space. Calculated from sv.shape if not provided.
             Optional, use only if no scikit-learn model is provided.
 
-        dual_coef: numpy.ndarray of shape (n_SV, 1)
+        dual_coef : numpy.ndarray of shape (n_SV, 1)
             SVM dual coefficients. Same as dual_coef_ in sklearn's SVC. Calculated as dual_coef[i] = alpha[i]*y[i].
             Optional, use only if no scikit-learn model is provided.
 
-        intercept: float
+        intercept : float
             The constant in the SVM decision function. Optional, use only if no scikit-learn model is provided.
 
-        kernel_d: int
+        kernel_d : int
             Degree of the polynomial kernel. Optional, use only if no scikit-learn model is provided.
 
-        kernel_r: float
+        kernel_r : float
             Independent term of the polynomial kernel. Optional, use only if no scikit-learn model is provided.
 
-        kernel_gamma: float or {'scale', 'auto'}
+        kernel_gamma : float or {'scale', 'auto'}
             Kernel coefficient controlling the relative importance of higher-order terms.
             Optional, use only if no scikit-learn model is provided.
 
-        svc_model: sklearn.svm.SVC
+        svc_model : sklearn.svm.SVC
             Trained Scikit-learn SVC model. Use to simplify creation of ExPSVM object.
             Parameters are extracted automatically from the SVC object.
 
         Attributes
         ----------
-
-        idx_unique: numpy.ndarray of str of shape (n_transform,)
+        _interactions : numpy.ndarray of str of shape (n_interactions,)
             List of unique indices that are explicitly included in the linear tranformations. Formatted as
-            ['i,j,k,l', 'i,i,k,l',...], for example. n_transform is the number of explicit interactions
+            ['i,j,k,l', 'i,i,k,l',...], for example. n_interactions is the number of explicit interactions
             in the linear model.
 
-        perm_count: numpy.ndarray of int of shape (n_transform,)
-            List of number of permutations of each index in idx_unique.
+        _perm_count : numpy.ndarray of int of shape (n_interactions,)
+            List of number of permutations of each index in _interactions.
 
-        idx_dim: numpy.ndarray of int of shape (n_transform,)
-            List of dimensionality of each interaction in idx_unique. Fo example, interaction x1*x2*x3
+        _interaction_dims: numpy.ndarray of int of shape (n_interactions,)
+            List of dimensionality of each interaction in _interactions. For example, interaction x1*x2*x3
             has dimensionality 3.
 
-        poly_coef: dict
+        _poly_coef : dict
             Dict containing constants relating to the dimensionality of the interaction, i.e. different constant for
             first order interactions compared to second order interactions.
             Calculated as (kernel_d choose d)*r^(kernel_d - d) where d is the dimensionality of the interaction.
 
-        mask_idx: numpy.ndarray of bool of shape (n_transform,)
+        interaction_mask : numpy.ndarray of bool of shape (n_interactions,)
             Boolean array with True for every element that should be kept in the linear transformation.
             The mask is used to select the most important features and reduce the size of the linear model.
 
-        linear_model: numpy.ndarray of float of shape (n_transform, 1)
+        linear_model : numpy.ndarray of float of shape (n_interactions, 1)
             Linear model transformed from the polynomial SVM model. Used to extract feature importance
             and calculate the decision function.
 
-        linear_model_is_masked: bool
+        linear_model_is_masked : bool
             Flag to propagate the information that the linear_model has already been masked and does not
             contain all interactions. Used when calculating the decision function and the feature importance
             when evaluated on individual observations.
@@ -198,7 +264,7 @@ class ExPSVM:
             # Scale in polynomial kernel
             self.kernel_gamma = svc_model._gamma
         else:
-            # Number of features
+            # Number of features in original space
             if p is None:
                 self.p = sv.shape[1]
             else:
@@ -206,62 +272,154 @@ class ExPSVM:
 
             # SVM model
             self.sv = sv
+            # SVM dual coefficients, equal to alpha_i*y_i in standard SVM formulation.
             self.dual_coef = np.reshape(dual_coef, (-1, 1))
+            # SVM intercept
             self.intercept = intercept
 
             # Polynomial kernel parameters
+            # Polynomial degree of kernel
             self.kernel_d = kernel_d
+            # Constant term in kernel
             self.kernel_r = kernel_r
+            # Scale in polynomial kernel
             self.kernel_gamma = kernel_gamma
 
         # Instantiate compressed polynomial SVM
-        self.idx_unique = np.array([])
-        self.perm_count = np.array([])
-        self.idx_dim = np.array([])
-        self.poly_coef = {d: comb(self.kernel_d, d) * (self.kernel_r ** (self.kernel_d - d))
-                          for d in np.arange(1, self.kernel_d + 1)}
-        self.mask_idx = np.array([])
+        # List of unique interactions
+        self._interactions = np.array([])
+        # List of number of permutations per interaction
+        self._perm_count = np.array([])
+        # List of dimensionality interaction
+        self._interaction_dims = np.array([])
+        # Constants used in linear model, one constant per polynomial term.
+        self._poly_coef = dict()
+        # Boolean array mask for feature selection
+        self.interaction_mask = np.array([])
 
+        # Numpy array with linear model
         self.linear_model = np.array([])
+        # Flag to ensure decision function uses masking if linear model has been masked.
         self.linear_model_is_masked: bool = False
 
-    def get_idx_unique(self, **kwargs) -> np.ndarray:
-        return self.idx_unique[self.get_dim_mask_index(**kwargs)]
+    def get_interactions(self, **kwargs) -> np.ndarray:
+        """
+        Returns numpy array of strings of interactions.
+        Example: The interaction x1*x1*x2*x3 is returned as '1,1,2,3'.
+
+        Parameters
+        ----------
+        kwargs : Arguments passed to get_interaction_index(). Used to reduce number of interactions.
+
+        Returns
+        -------
+        Interactions : Numpy ndarray of shape (n_interactions,) of str.
+            Array of strings with interactions.
+        """
+        return self._interactions[self.get_interaction_index(**kwargs)]
 
     def get_perm_count(self, **kwargs) -> np.ndarray:
-        return self.perm_count[self.get_dim_mask_index(**kwargs)]
+        """
+        Returns numpy array of number of permutations of the interactions in _interactions.
+        Example: The interaction x1*x1*x2*x3 has 4!/2!=12 possible interactions.
 
-    def get_idx_dim(self, **kwargs) -> np.ndarray:
-        return self.idx_dim[self.get_dim_mask_index(**kwargs)]
+        Parameters
+        ----------
+        kwargs : Arguments passed to get_interaction_index(). Used to reduce the number of interactions.
+
+        Returns
+        -------
+        Permutation count : Numpy ndarray of shape (n_interactions,)
+            Array of the number of permutations for each interaction in _interactions.
+        """
+        return self._perm_count[self.get_interaction_index(**kwargs)]
+
+    def get_interaction_dim(self, **kwargs) -> np.ndarray:
+        """
+        Returns numpy array of the dimension of each interaction in _interactions.
+        Example: The interaction x1*x1*x2*x3 has dimension 4.
+
+        Parameters
+        ----------
+        kwargs : Arguments passed to get_interaction_index(). Used to reduce number of interactions.
+
+        Returns
+        -------
+        Interaction dimensions : Numpy ndarray of shape (n_interactions,)
+            Array of the dimension of the interactions in _interactions.
+        """
+        return self._interaction_dims[self.get_interaction_index(**kwargs)]
 
     def get_linear_model(self, **kwargs) -> np.ndarray:
+        """
+        Returns numpy array of the linear model transformed from the polynomial SVM.
+        If linear_model_is_masked is False, kwargs can be supplied to include only selected
+        interactions, as controlled by get_interaction_index().
+
+        Parameters
+        ----------
+        kwargs : Arguments passed to get_interaction_index(). Used to reduce the number of interactions.
+
+        Returns
+        -------
+        Linear model : Numpy ndarray of shape (n_interactions, 1)
+            Linear model of the polynomial SVM model.
+        """
         if self.linear_model_is_masked:
             return self.linear_model
         else:
-            return self.linear_model[self.get_dim_mask_index(**kwargs), :]
+            return self.linear_model[self.get_interaction_index(**kwargs), :]
 
-    def _multiplication_transform(self) -> None:
+    def _set_transform(self) -> None:
         """
-        For each polynomial term, identify unique indexes and the number of permutations of each index.
+        Set _interactions, _perm_count, _interaction_dims and _poly_coef based on the number of features and the
+        chosen polynomial kernel.
+
+        Returns
+        -------
+        self : Instance
+            Instance with _interactions, _perm_count, _interaction_dims and _poly_coef based on the number of features
+            and the chosen polynomial kernel.
         """
         for d in np.arange(1, self.kernel_d + 1):
             tp = TensorUtil(d, self.p)
             idx_tmp, n_perm_tmp = tp.n_perm()
-            self.idx_unique = np.concatenate((self.idx_unique, idx_tmp))
-            self.perm_count = np.concatenate((self.perm_count, n_perm_tmp))
-            self.idx_dim = np.concatenate((self.idx_dim, d * np.ones((len(idx_tmp),))))
+            self._interactions = np.concatenate((self._interactions, idx_tmp))
+            self._perm_count = np.concatenate((self._perm_count, n_perm_tmp))
+            self._interaction_dims = np.concatenate((self._interaction_dims, d * np.ones((len(idx_tmp),))))
+            self._poly_coef[d] = comb(self.kernel_d, d) * (self.kernel_r ** (self.kernel_d - d))
 
-    def _compress_transform(self, x: np.ndarray, reduce_memory: bool = False, mask: bool = False):
+    def _compress_transform(self, x: np.ndarray, reduce_memory: bool = False,
+                            mask: bool = False, output_dict: bool = False):
         """
-        :param: x: Observation(s) to transform. Shape of ndarray is assumed to be n_observations-by-n_features.
-        :param reduce_memory: Set to False (default) for handling all support vectors and transformations at once. If
-        True, handle one support vector at a time for reduced memory usage.
-        :return: trans_dict, the transformed features of x. Structured as dict with
-        keys being the polynomial degree. The order is the same as given by get_dim_idx(d, mask)
+        Transform observations in x in original space into the transformed space of the polynomial kernel.
+
+        Parameters
+        ----------
+        x : Numpy array of shape (n_observations, n_features)
+            Observation(s) to transform. Shape of ndarray is assumed to be (n_observations, n_features). n_features are
+            in the original space.
+        reduce_memory : Boolean
+            Set to False (default) for handling all observations and transformations at once. If True, handle one
+            observation at a time for reduced memory usage.
+        mask : Boolean
+            If True, apply interaction_mask when computing the components of the transformation.
+        output_dict : Boolean.
+            If True, output dict with polynomial parts as keys. If False output numpy ndarray of shape
+            (n_observations, n_interactions). Default is False.
+
+        Returns
+        -------
+        transformation : Numpy ndarray of shape (n_observations, n_interactions) or dict.
+            The transformed features of x. Structured as dict with keys being the polynomial degree, 1, 2,..., kernel_d.
+            The order is the same as given by get_interaction_index(d, mask).
         """
-        trans_dict = dict()
+        transformation = dict()
         for d in np.arange(1, self.kernel_d + 1):
-            d_idx = [[int(ch) for ch in idx.split(',')] for idx in self.get_idx_unique(d=d, mask=mask)]
+            # Extract list of indices in the interactions.
+            d_idx = [[int(ch) for ch in idx.split(',')] for idx in self.get_interactions(d=d, mask=mask)]
+            # Create rank-3 tensor of each observation with the elements of the interaction in the last dimension.
+            # Find the interactions by calculating the product along the last dimension of the tensor.
             if len(d_idx) > 0:
                 if reduce_memory:
                     feat_trans = np.zeros((x.shape[0], len(d_idx)))
@@ -269,163 +427,267 @@ class ExPSVM:
                         feat_trans[ind, :] = np.squeeze(np.prod(np.expand_dims(v, axis=0)[:, d_idx], axis=2))
                 else:
                     feat_trans = np.squeeze(np.prod(x[:, d_idx], axis=2))
+
+                # Reshape into (1, n_interactions) if needed.
                 if len(feat_trans.shape) == 1:
                     feat_trans = np.reshape(feat_trans, (1, feat_trans.shape[0]))
-                trans_dict[d] = feat_trans
+                transformation[d] = feat_trans
             else:
-                trans_dict[d] = np.array([])
-        return trans_dict
+                transformation[d] = np.array([])
+        # Output either as dict or numpy ndarray.
+        if not output_dict:
+            transformation = dict2array(transformation)
+        return transformation
 
-    def get_dim_mask_index(self, idx_strs: List[str] = None, d: int = None, mask: bool = False) -> np.ndarray:
+    def get_interaction_index(self, interaction_strs: List[str] = None,
+                              d: int = None, mask: bool = False) -> np.ndarray:
         """
-        Returns index in transformed space of dimension d that are in mask.
+        Returns indices of interactions from _interactions based on a list of interaction strings and/or interaction
+        dimension and/or interactions included in interaction_mask.
+        If multiple of interaction_strs, d, and mask are provided, the intersection of the provided inputs are used.
+        That is, if both interaction_strs and d ir
+        provided, only indices of interactions of dimension d that are also in interaction_strs are returned.
 
-        :param idx_strs:
-        :param d: Dimension to extract indexes from.
-        :param mask: Set to True to extract only indexes in mask of dimension d. Default False.
-        :return:
+        Parameters
+        ----------
+        interaction_strs : List[str]
+            Interactions to include.
+        d : int
+            Dimension to extract indexes from.
+        mask : Boolean
+            Set to True to extract only indexes in mask of dimension d. Default False.
+
+        Returns
+        -------
+        ind : Numpy ndarray of shape (n_interactions,)
+            Boolean array with True at elements that satisfy all inputs.
         """
 
         if mask:
-            if self.mask_idx.size > 0:
-                ind = self.mask_idx
+            if self.interaction_mask.size == self._interactions.size:
+                ind = self.interaction_mask
             else:
                 raise ValueError("Instance variable mask is empty.")
         else:
-            ind = np.full(self.idx_unique.shape, True)
+            ind = np.full(self._interactions.shape, True)
 
-        if idx_strs is not None:
-            ind = ind & np.isin(self.get_idx_unique(), idx_strs)
+        if interaction_strs is not None:
+            ind = ind & np.isin(self.get_interactions(), interaction_strs)
 
         if d is not None:
-            ind = ind & (self.idx_dim == d)
-
+            ind = ind & (self._interaction_dims == d)
         return ind
-
-    @classmethod
-    def dict2array(cls, di) -> np.ndarray:
-        """
-        Flatten dict to array. Dict is assumed to have structure {1:array_1, 2:array_2,...} where array_x are 2d
-        arrays where rows are assumed belonging together.
-
-        Example: The array
-        {1:np.array([[1, 2, 3], [1, 2, 3]]),2:np.array([[1, 2, 3, 4, 6, 9], [1, 2, 3, 4, 6, 9]])}
-        is returned as [[1, 2, 3, 1, 2, 3, 4, 6, 9], [1, 2, 3, 1, 2, 3, 4, 6, 9]]
-
-        :param di: Dictionary to transform
-        :return: numpy.ndarray of shape n_sample-by-n_transformed_features-shaped.
-        """
-        return np.concatenate([*{key: val for key, val in di.items() if val.size > 0}.values()], axis=-1)
 
     def transform_svm(self, reduce_memory: bool = False, mask: bool = False):
         """
-        Calculate compressed linear version for SVM model with polynomial kernel.
-        :param mask:
-        :param reduce_memory:
-        :return:
-        """
-        if (self.idx_unique.size == 0) or (self.perm_count.size == 0):
-            self._multiplication_transform()
-        compressed_transform = self._compress_transform(x=self.sv, reduce_memory=reduce_memory, mask=mask)
+        Calculate and set a compressed linear version of the polynomial SVM model.
 
-        # Multiply by dual coefficients, sum over support vectors, and scale with polynomial coefficient
-        for d in compressed_transform.keys():
-            if compressed_transform[d].size > 0:
-                compressed_transform[d] = self.poly_coef[d] * (self.kernel_gamma**d) * (
-                    np.sum(np.multiply(self.dual_coef,
-                                       np.multiply(self.get_perm_count(d=d, mask=mask), compressed_transform[d])),
-                           axis=0, keepdims=False))
+        Parameters
+        ----------
+        reduce_memory : Boolean
+            Set to True to reduce memory usage by looping over support vectors instead of transforming all at once.
+            Default is False.
+        mask : Boolean
+            Set to True to apply mask to the linear model, reducing the number of elements of the model. Note that
+            masking can alternatively be applied when calculating decision functions, to, for example, evaluate feature
+            selection.
+
+        Returns
+        -------
+        self : Instance
+            Instance with linear model.
+        """
+
+        if (self._interactions.size == 0) or (self._perm_count.size == 0):
+            self._set_transform()
+
+        # Get transformation of support vectors.
+        transform = self._compress_transform(x=self.sv, reduce_memory=reduce_memory, mask=mask, output_dict=True)
+
+        # Multiply transform by dual coefficients, sum over support vectors, and scale with polynomial coefficient
+        for d in transform.keys():
+            if transform[d].size > 0:
+                # Multiply compressed transform by number of permutations of each interaction.
+                transform_tmp = np.multiply(self.get_perm_count(d=d, mask=mask), transform[d])
+                # Multiply by the SVM dual coefficients.
+                transform_tmp = np.multiply(self.dual_coef, transform_tmp)
+                # Sum over support vectors.
+                transform_tmp = np.sum(transform_tmp, axis=0, keepdims=False)
+                # Multiply by binomial coefficient and gamma constant.
+                transform[d] = self._poly_coef[d] * (self.kernel_gamma ** d) * transform_tmp
 
         # Create linear model
-        self.linear_model = np.expand_dims(self.dict2array(compressed_transform), axis=1)
+        self.linear_model = np.expand_dims(dict2array(transform), axis=1)
+
+        # Set linear_model_is_masked flag.
         if mask:
             self.linear_model_is_masked = True
 
-    def polynomial_kernel(self, x: np.ndarray, y: np.ndarray):
-        if len(x.shape) == 1:
-            x = x.reshape((1, -1))
-        if len(x.shape) > 2:
-            raise ValueError("x should be 2-dimensional. Shape of x is {}".format(x.shape))
-        if len(y.shape) == 1:
-            y = y.reshape((1, -1))
-        if len(y.shape) > 2:
-            raise ValueError("y should be 2-dimensional. Shape of y is {}".format(y.shape))
-        return (self.kernel_r + np.sum(np.multiply(x, y), axis=1, keepdims=False)) ** self.kernel_d
-
-    def decision_function_components(self, x: np.ndarray, output_feat_names: bool = False,
+    def decision_function_components(self, x: np.ndarray, output_interaction_names: bool = False,
                                      reduce_memory: bool = False, mask: bool = False):
+        """
+        Returns the components of the decision function for the observation(s) x.
+
+        Parameters
+        ----------
+        x : Numpy ndarray of shape (n_observations, n_features)
+            Observations to calculate decision function for.
+        output_interaction_names : Boolean
+            If True, return also the names of the interactions.
+        reduce_memory : Boolean
+            Set to True to reduce memory requirements when calculating the compressed linear transform of x.
+            Default is False.
+        mask : Boolean
+            Set to True to apply interaction_mask to the decision function, removing some interactions.
+            Default is False.
+
+        Returns
+        -------
+        df_comp : Numpy ndarray of shape (n_observations, n_interactions+1)
+            The components of the decision function. df_comp[0] correspond to the independent component, remaining are
+            given in the same order as _interactions.
+        """
         if len(x.shape) == 1:
             x = x.reshape((1, -1))
         if len(x.shape) > 2:
             raise ValueError("x should be 2-dimensional. Shape of x is {}.".format(x.shape))
         use_mask = mask or self.linear_model_is_masked
-        x_trans = self.dict2array(self._compress_transform(x=x, reduce_memory=reduce_memory, mask=use_mask))
+        x_trans = self._compress_transform(x=x, reduce_memory=reduce_memory,
+                                           mask=use_mask, output_dict=False)
 
-        dot_prod = np.multiply(x_trans, np.transpose(self.get_linear_model()))
+        df_comp = np.multiply(x_trans, np.transpose(self.get_linear_model()))
         constant = self.intercept
 
-        dot_prod = np.concatenate((constant * np.ones((x.shape[0], 1)), dot_prod), axis=1)
-        if output_feat_names:
-            feat = np.concatenate((['constant'], self.get_idx_unique(mask=use_mask)), axis=0)
-            return dot_prod, feat
+        df_comp = np.concatenate((constant * np.ones((x.shape[0], 1)), df_comp), axis=1)
+        if output_interaction_names:
+            feat = np.concatenate((['constant'], self.get_interactions(mask=use_mask)), axis=0)
+            return df_comp, feat
         else:
-            return dot_prod
+            return df_comp
 
     def decision_function(self, x: np.ndarray, reduce_memory: bool = False, mask: bool = False):
-        dot_prod = self.decision_function_components(x=x, output_feat_names=False,
+        """
+        Returns the decision function value for observation(s) x.
+
+        Parameters
+        ----------
+        x : Numpy ndarray of shape (n_observations, n_features)
+            Observations to calculate decision function for.
+        reduce_memory : Boolean
+            Set to True to reduce memory requirements when calculating the compressed linear transform of x.
+            Default is False.
+        mask : Boolean
+            Set to True to apply interaction_mask to the decision function, removing some interactions.
+            Default is False.
+
+        Returns
+        -------
+        X : Numpy ndarray of shape (n_observations,)
+            Decision function for each observation.
+        """
+        dot_prod = self.decision_function_components(x=x, output_interaction_names=False,
                                                      reduce_memory=reduce_memory, mask=mask)
         return np.sum(dot_prod, axis=1, keepdims=False)
 
     def feature_importance(self, sort: bool = True, **kwargs):
+        """
+        Calculate feature importance and return feature importance, feature names and sorting order.
+
+        Parameters
+        ----------
+        sort : Boolean
+            If True (default) sort the features in order of importance.
+        kwargs : Arguments passed to get_linear_model.
+
+        Returns
+        -------
+        feat_importance : Numpy ndarray of shape (n_interactions,)
+            Array with feature importance.
+        feat_names : Numpy ndarray of shape (n_interactions,)
+            Names of the features.
+        sort_order : Numpy ndarray of shape (n_interactions,)
+            Sorting order to get from _interactions to the feature importance order.
+        """
         if sort:
             sort_order = np.argsort(np.squeeze(self.get_linear_model(**kwargs)))[::-1]
         else:
-            sort_order = np.arange(self.idx_unique.size)
-        feat_imp = np.abs(self.get_linear_model(**kwargs)[sort_order, 0])
-        feat = self.get_idx_unique(**kwargs)[sort_order]
-        return feat_imp, feat, sort_order
+            sort_order = np.arange(self._interactions.size)
+        feat_importance = np.abs(self.get_linear_model(**kwargs)[sort_order, 0])
+        feat_names = self.get_interactions(**kwargs)[sort_order]
+        return feat_importance, feat_names, sort_order
 
-    def feature_selection(self, n_feat: int = None,
-                          frac_feat: float = None,
+    def feature_selection(self, n_interactions: int = None,
+                          frac_interactions: float = None,
                           frac_importance: float = None):
         """
+        Return the most important features given either: a set number of interactions; a fraction of the interactions;
+        or a fraction of the interaction importance.
 
-        :param n_feat:
-        :param frac_feat:
-        :param frac_importance:
-        :return:
+        Importance is measured by the magnitude of the interaction in the linear model.
+
+        Parameters
+        ----------
+        n_interactions : int
+            Number of the most important interactions to select.
+        frac_interactions : float in range [0,1]
+            Fraction of the most important interactions to select.
+        frac_importance : float in range [0,1]
+            Select number of interactions given by the total contribution to the decision function.
+
+        Returns
+        -------
+        interaction_mask : Boolean numpy ndarray of shape (n_interactions,)
+            Boolean array where True at elements that are judges as important by the input constraints.
         """
 
         feat_imp, _, sort_order = self.feature_importance()
-        if n_feat is not None:
-            if (n_feat < 1) or (n_feat > self.idx_unique.size):
+        if n_interactions is not None:
+            if (n_interactions < 1) or (n_interactions > self._interactions.size):
                 raise ValueError("n_feat should be an integer in the range [0,{}]. Current value: {}"
-                                 .format(self.idx_unique.size, n_feat))
-        elif frac_feat is not None:
-            if (frac_feat <= 0) or (frac_feat > 1):
+                                 .format(self._interactions.size, n_interactions))
+        elif frac_interactions is not None:
+            if (frac_interactions <= 0) or (frac_interactions > 1):
                 raise ValueError("frac_feat should be an integer in the range ]0,1]. Current value: {}"
-                                 .format(frac_feat))
-            n_feat = int(frac_feat * self.idx_unique.size)
+                                 .format(frac_interactions))
+            n_interactions = int(frac_interactions * self._interactions.size)
         elif frac_importance is not None:
             if (frac_importance <= 0) or (frac_importance > 1):
                 raise ValueError("frac_feat_imp should be an integer in the range ]0,1]. Current value: {}"
                                  .format(frac_importance))
             fi_csum = np.cumsum(feat_imp)
 
-            n_feat = int(np.sum((fi_csum / fi_csum[-1]) <= frac_importance))
+            n_interactions = int(np.sum((fi_csum / fi_csum[-1]) <= frac_importance))
+        else:
+            n_interactions = self._interactions.size
 
-        bool_mask = np.full((self.idx_unique.size,), False)
-        bool_mask[sort_order[:n_feat]] = True
-        return bool_mask
+        interaction_mask = np.full((self._interactions.size,), False)
+        interaction_mask[sort_order[:n_interactions]] = True
+        return interaction_mask
 
-    def set_mask(self, mask: np.ndarray = None, mask_strs: List[str] = None, **kwargs):
+    def set_mask(self, mask: np.ndarray = None, interaction_strs: List[str] = None, **kwargs):
+        """
+        Set mask for the compressed linear transformation of the polynomial SVM.
+
+        Parameters
+        ----------
+        mask : Boolean Numpy ndarray of shape (n_interactions,).
+            Interactions to include.
+        interaction_strs : List[str]
+            Interactions to include in the mask. Interactions should have format: 'i,j,k,...', e.g. '0,0'.
+        kwargs : Arguments passed to feature_selection().
+
+        Returns
+        -------
+        self : Instance.
+            Instance with interaction_mask.
+        """
         if mask is not None:
             if mask.dtype == bool:
-                self.mask_idx = mask
+                self.interaction_mask = mask
             else:
                 raise TypeError("mask should have dtype bool. Current type: {}".format(mask.dtype))
-        elif mask_strs:
-            if mask_strs is not None:
-                self.mask_idx = self.get_dim_mask_index(idx_strs=mask_strs)
+        elif interaction_strs:
+            if interaction_strs is not None:
+                self.interaction_mask = self.get_interaction_index(interaction_strs=interaction_strs)
         else:
-            self.mask_idx = self.feature_selection(**kwargs)
+            self.interaction_mask = self.feature_selection(**kwargs)
