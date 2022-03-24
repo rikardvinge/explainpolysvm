@@ -1,4 +1,0 @@
-Write README
-Add build functionality
-Move tests to separate folder
-Rename folder expsvm into explain_polynomial_svm

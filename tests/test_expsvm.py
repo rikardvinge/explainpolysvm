@@ -1,11 +1,13 @@
 import pytest
 import numpy as np
-from expsvm import explain_svm as exp
+from .context import expsvm as exp
+# from explain_poly_svm import expsvm as exp
 from sklearn.datasets import load_breast_cancer, make_classification
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 from sklearn.model_selection import train_test_split
 from typing import Tuple
+
 
 @pytest.fixture
 def std_p():
@@ -156,7 +158,7 @@ class TestExPSVM:
         """
         Verify that the TensorUtil.create_unique_index() produce a correct set of tensor indices.
         """
-        tp = exp.TensorUtil(std_d, std_p)
+        tp = exp.InteractionUtils(std_d, std_p)
         test_set = set(tp.create_unique_index())
         true_set = set(std_idx[3:])
         sym_intersect = true_set.symmetric_difference(test_set)
@@ -167,7 +169,7 @@ class TestExPSVM:
         Verify that TensorUtil._count_index_occurrences() counts the correct number of occurrences of each index.
         For example, elements (i,i) have count '2' while (i,j) has count 1,1.
         """
-        tp = exp.TensorUtil(std_d, std_p)
+        tp = exp.InteractionUtils(std_d, std_p)
         idx_list = tp.create_unique_index()
         idx_count, unique_idx_count = tp._count_index_occurrences(idx_list)
         compare = []
@@ -187,7 +189,7 @@ class TestExPSVM:
         """
         p = 4
         d = 3
-        tp = exp.TensorUtil(d, p)
+        tp = exp.InteractionUtils(d, p)
         count_str = '1,2'
         n_perm = tp._count_perm(count_str)
         assert n_perm == 3
@@ -206,7 +208,7 @@ class TestExPSVM:
         """
         p = 8
         d = 5
-        tp = exp.TensorUtil(d, p)
+        tp = exp.InteractionUtils(d, p)
         count_str = '1,2,2'
         n_perm = tp._count_perm(count_str)
         assert n_perm == 30
@@ -215,7 +217,7 @@ class TestExPSVM:
         """
         Verify that TensorUtil.n_perm() finds the correct tensor indices and number of permutations of each index.
         """
-        tu = exp.TensorUtil(std_d, std_p)
+        tu = exp.InteractionUtils(std_d, std_p)
         idx_list, n_perm = tu.n_perm()
 
         # Check that all indexes exist
@@ -407,7 +409,7 @@ class TestExPSVM:
 
         # When comparing the decision function between the polynomial kernel and
         # our decision function, we should add the SVM intercept and subtract
-        # r^d. The latter term comes from the kernel expansion but is removed due
+        # r^d. The latter term comes from the kernel expansion but is removed
         # due to the KKT conditions.
         constant = std_intercept - std_r ** std_d
 
@@ -578,8 +580,8 @@ class TestExPSVM:
 
     def test_compare_sklearn_svc_artificial_data_2d(self):
         """
-        Verify that the ExPSVM decision function and the Scikit-learn SVC decision function produce the same results on a
-        toy dataset with 2 features.
+        Verify that the ExPSVM decision function and the Scikit-learn SVC decision function produce the same results
+        on a toy dataset with 2 features.
 
         The dataset consists of one class being everything within the unit circle and the other class a ring concentric
         with the origin with minimum radius 1 and maximum radius 1.41.
@@ -635,11 +637,11 @@ class TestExPSVM:
 
     def test_compare_sklearn_svc_artificial_data_7d(self):
         """
-        Verify that the ExPSVM decision function and the Scikit-learn SVC decision function produce the same results on a
-        toy dataset with 7 features.
+        Verify that the ExPSVM decision function and the Scikit-learn SVC decision function produce the same results
+        on a toy dataset with 7 features.
 
-        The dataset is generated using Scikit-learn's make_classification, with 5 informative features, 2 non-informative
-        features, 2 classes and 3 clusters per class.
+        The dataset is generated using Scikit-learn's make_classification, with 5 informative features,
+        2 non-informative features, 2 classes and 3 clusters per class.
 
         A tolerance of 1e-10 is used, i.e. the two decision functions should be within 1e-10 from each other on all
         test samples. The number of test samples is 100.
@@ -686,8 +688,8 @@ class TestExPSVM:
 
     def test_compare_sklearn_svc_breast_cancer(self):
         """
-        Verify that the ExPSVM decision function and the Scikit-learn SVC decision function produce the same results on the
-        30-dimensional breast cancer dataset.
+        Verify that the ExPSVM decision function and the Scikit-learn SVC decision function produce the same results
+        on the 30-dimensional breast cancer dataset.
 
         The Breast cancer dataset is downloaded using Scikit-learn and publicly available here:
         https://archive.ics.uci.edu/ml/datasets/Breast+Cancer+Wisconsin+(Diagnostic)

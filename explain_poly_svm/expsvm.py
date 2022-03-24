@@ -5,14 +5,15 @@ from typing import List, Tuple
 from sklearn.svm import SVC
 
 
-class TensorUtil:
+class InteractionUtils:
     """
-    Tensor utilities.
+    Feature interaction utilities.
 
-    Helper class to handle tensor operations.
+    Helper class to identify and enumerate interactions.
 
-    The tensors are assumed to be permutation symmetric, i.e. to elements with indices that are permutations of each
-    other are equal. The tensors are also assumed to have the same number of elements in each dimension.
+    Interactions of dimension d can be viewed as elements of a rank-d tensor. The tensor is permutation symmetric,
+    i.e. to elements with indices that are permutations of each other are equal. The tensors are also assumed to have
+    the same number of elements in each dimension.
 
     For example: The values at locations (i,i,k), (i,k,i) and (k,i,i) are all assumed to be identical.
 
@@ -20,40 +21,40 @@ class TensorUtil:
 
     Parameters
     ----------
-    rank : int
-        Rank of tensor.
-    dim : int
-        Dimension of each component of the tensor.
+    interaction_dim : int
+        Dimension of interaction.
+    n_feature : int
+        Number of features in original space.
 
     """
-    def __init__(self, rank: int, dim: int) -> None:
-        self.rank = rank
-        self.dim = dim
+    def __init__(self, interaction_dim: int, n_feature: int) -> None:
+        self.interaction_dim = interaction_dim
+        self.n_feature = n_feature
 
     def create_unique_index(self) -> List[str]:
         """
-        Create set of tensor indexes where the order of the indexes does not matter.
-        That is, the tensor is symmetric such that the elements at index (i,j,k,l) and
-        (i,k,j,l) are identical for any number of indices and tensor rank.
+        Create set of interactions where the order of the indexes does not matter.
+        That is, the interaction is symmetric such that the elements at index (i,j,k,l) and
+        (i,k,j,l) are identical for any number of features and interaction dimension.
 
         :return: List[str].
 
         Returns
         -------
         idx_strs : List[str]
-            List of indices of unique elements in a tensor with symmetry such that the value at permuted locations are
-            equal.
+            List of indices of unique interaction such that values at permuted interactions are equal.
         """
-        list_idx = list(it.combinations_with_replacement(np.arange(self.dim), self.rank))
+        list_idx = list(it.combinations_with_replacement(np.arange(self.n_feature), self.interaction_dim))
         return [','.join([str(idx) for idx in tup]) for tup in list_idx]
 
     @classmethod
     def _count_index_occurrences(cls, idx_list) -> Tuple[List[str], List[str]]:
         """
-        Count the number of occurrences of each index.
-         For example, the element (0,0,1,2,3) has occurrences 2,1,1,1,0.
+        Count the number of occurrences of each index in the interaction.
+
+        For example, the element (0,0,1,2,3) has occurrences 2,1,1,1,0.
         corresponding to two 0s, one 1, one 2, one 3 and zero 4. The 4 ins included since this
-        is the highest possible index in this tensor.
+        is the highest possible index in this interaction.
 
         Parameters
         ----------
@@ -80,7 +81,7 @@ class TensorUtil:
             for idx in idx_set:
                 count = idx_list.count(idx)
                 counts.append(count)
-            # Store counts as sorted string separated with comma. Sorted with smallest number of occurrences first.
+            # Store counts as sorted string separated with comma. Sorted with the smallest number of occurrences first.
             counts.sort()
             # Convert to string and join with separating comma.
             counts = ','.join([str(count) for count in counts])
@@ -90,14 +91,14 @@ class TensorUtil:
 
     def n_perm(self) -> Tuple[List[str], List[int]]:
         """
-        List unique tensor indices and the number of permutations for each index.
+        List unique interactions and the number of permutations for each interaction.
 
         Returns
         -------
         interactions : List[str]
-            List of unique tensor indices given permutation symmetry of the indexes.
+            List of unique interactions given permutation symmetry of the indexes.
         perm_count : List[str]
-            List of counts of permutation for each index in interactions.
+            List of the number of possible permutations for each interaction.
         """
         interactions = self.create_unique_index()
         count_strs, count_strs_unique = self._count_index_occurrences(interactions)
@@ -108,21 +109,22 @@ class TensorUtil:
 
     def _count_perm(self, count_str: str) -> int:
         """
-        Calculate number of symmetries from a string formatted as 'xyz...' where x is the number of occurrences of the
-        first index, y is the number of occurrences of the second index, etc.
+        Calculate number of permutations from a string formatted as 'x,y,z,...' where x is the number of occurrences
+        of the first index, y is the number of occurrences of the second index, etc.
 
         Example:
-        A tensor element is located at (i,j,i,k,l). The number of permutations, e.g. (i,i,j,k,l),
+        Take the interaction xi^2*xj*xk*xl. This can be viewed as a tensor element located at (i,i,j,k,l).
+        The number of permutations, e.g. (i,i,j,k,l),
         is then 5!/(2!)=60
         5! is from the rank of the tensor. It's possible to place 5 distinct values in 5! ways.
         Now, 2 indexes were the same, meaning the total number of unique permutations is reduced.
         The reduction is 2!, from the number of possible ways we can interchange the two identical indexes.
-        Rank of tensor is 5=2+1+1+1, i.e. the number of occurences of i,j,k,l.
+        Rank of tensor is 5=2+1+1+1, i.e. the number of occurrences of i,j,k,l.
 
         Parameters
         ----------
         count_str : str
-            String of occurrences of each index in a tensor.
+            String of occurrences of each index in an interaction.
 
         Returns
         -------
@@ -134,7 +136,7 @@ class TensorUtil:
             perm_reduction = 1
         else:
             perm_reduction = np.prod([np.math.factorial(count) for count in counts_list])
-        n_perm = int(np.math.factorial(self.rank) / perm_reduction)
+        n_perm = int(np.math.factorial(self.interaction_dim) / perm_reduction)
         return n_perm
 
 
@@ -183,7 +185,7 @@ class ExPSVM:
             Support vectors. Optional, use only if no scikit-learn model is provided.
 
         p : int
-            Number of features in original space. Calculated from sv.shape if not provided.
+            Number of features in original space. Calculated from sv if not provided.
             Optional, use only if no scikit-learn model is provided.
 
         dual_coef : numpy.ndarray of shape (n_SV, 1)
@@ -210,7 +212,7 @@ class ExPSVM:
         Attributes
         ----------
         _interactions : numpy.ndarray of str of shape (n_interactions,)
-            List of unique indices that are explicitly included in the linear tranformations. Formatted as
+            List of unique indices that are explicitly included in the linear transformations. Formatted as
             ['i,j,k,l', 'i,i,k,l',...], for example. n_interactions is the number of explicit interactions
             in the linear model.
 
@@ -222,9 +224,9 @@ class ExPSVM:
             has dimensionality 3.
 
         _poly_coef : dict
-            Dict containing constants relating to the dimensionality of the interaction, i.e. different constant for
-            first order interactions compared to second order interactions.
-            Calculated as (kernel_d choose d)*r^(kernel_d - d) where d is the dimensionality of the interaction.
+            Dictionary containing constants relating to the dimensionality of the interaction,
+            i.e. different constant for first order interactions compared to second order interactions. Calculated as
+            (kernel_d choose d)*r^(kernel_d - d) where d is the dimensionality of the interaction.
 
         interaction_mask : numpy.ndarray of bool of shape (n_interactions,)
             Boolean array with True for every element that should be kept in the linear transformation.
@@ -382,7 +384,7 @@ class ExPSVM:
             and the chosen polynomial kernel.
         """
         for d in np.arange(1, self.kernel_d + 1):
-            tp = TensorUtil(d, self.p)
+            tp = InteractionUtils(d, self.p)
             idx_tmp, n_perm_tmp = tp.n_perm()
             self._interactions = np.concatenate((self._interactions, idx_tmp))
             self._perm_count = np.concatenate((self._perm_count, n_perm_tmp))
@@ -606,7 +608,7 @@ class ExPSVM:
         feat_names : Numpy ndarray of shape (n_interactions,)
             Names of the features.
         sort_order : Numpy ndarray of shape (n_interactions,)
-            Sorting order to get from _interactions to the feature importance order.
+            Sorting order to get feat_names from _interactions.
         """
         if sort:
             sort_order = np.argsort(np.squeeze(self.get_linear_model(**kwargs)))[::-1]
