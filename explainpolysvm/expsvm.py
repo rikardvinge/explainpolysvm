@@ -209,6 +209,11 @@ class ExPSVM:
             Trained Scikit-learn SVC model. Use to simplify creation of ExPSVM object.
             Parameters are extracted automatically from the SVC object.
 
+        transform : bool
+            Set to True to transform SVM model at creation of ExPSVM object. Otherwise, a call to transfrom_svm()
+            is required. The transformation is done using transform_svm() without any input and may become
+            computationally heavy if kernel dimension and the number of features are large. Default is False.
+
         Attributes
         ----------
         _interactions : numpy.ndarray of str of shape (n_interactions,)
@@ -245,7 +250,7 @@ class ExPSVM:
     def __init__(self, sv: np.ndarray = None, dual_coef: np.ndarray = None,
                  intercept: float = None,
                  kernel_d: int = None, kernel_r: float = None, kernel_gamma: float = None,
-                 p: int = None, svc_model: SVC = None) -> None:
+                 p: int = None, svc_model: SVC = None, transform: bool = False) -> None:
 
         if svc_model is not None:
             if svc_model.classes_.size != 2:
@@ -303,6 +308,10 @@ class ExPSVM:
         self.linear_model = np.array([])
         # Flag to ensure decision function uses masking if linear model has been masked.
         self.linear_model_is_masked: bool = False
+
+        # Transform
+        if transform:
+            self.transform_svm()
 
     def get_interactions(self, **kwargs) -> np.ndarray:
         """
