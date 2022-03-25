@@ -554,13 +554,16 @@ class ExPSVM:
         if len(x.shape) > 2:
             raise ValueError("x should be 2-dimensional. Shape of x is {}.".format(x.shape))
         use_mask = mask or self.linear_model_is_masked
+        # Transform observations to compressed linear form, possibly masked.
         x_trans = self._compress_transform(x=x, reduce_memory=reduce_memory,
                                            mask=use_mask, output_dict=False)
 
+        # Compute the dependent components of the decision functions. These are the element-wise multiplications
+        # of the observations and the linear model.
         df_comp = np.multiply(x_trans, np.transpose(self.get_linear_model()))
-        constant = self.intercept
 
-        df_comp = np.concatenate((constant * np.ones((x.shape[0], 1)), df_comp), axis=1)
+        # Prepend the independent component, the SVM intercept.
+        df_comp = np.concatenate((self.intercept * np.ones((x.shape[0], 1)), df_comp), axis=1)
         if output_interaction_names:
             feat = np.concatenate((['constant'], self.get_interactions(mask=use_mask)), axis=0)
             return df_comp, feat

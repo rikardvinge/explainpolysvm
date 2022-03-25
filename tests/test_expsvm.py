@@ -1,7 +1,6 @@
 import pytest
 import numpy as np
 from .context import expsvm as exp
-# from explain_poly_svm import expsvm as exp
 from sklearn.datasets import load_breast_cancer, make_classification
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
@@ -114,7 +113,8 @@ def polynomial_kernel(x: np.ndarray, y: np.ndarray, r: float, d: int, gamma: flo
         y = y.reshape((1, -1))
     if len(y.shape) > 2:
         raise ValueError("y should be 2-dimensional. Shape of y is {}".format(y.shape))
-    return (r + gamma * np.sum(np.multiply(x, y), axis=1, keepdims=False)) ** d
+    return (r + gamma * np.matmul(x, np.transpose(y))) ** d
+    # return (r + gamma * np.sum(np.multiply(x, y), axis=1, keepdims=False)) ** d
 
 
 def create_sklearn_expsvm_models(X_train, y_train, C, degree, gamma, r) -> Tuple[SVC, exp.ExPSVM]:
@@ -382,11 +382,12 @@ class TestExPSVM:
         Verify that polynomial_kernel(), a help function in this test suite, produce correct Gram matrices.
         """
         assert np.all(
-            polynomial_kernel(std_arr, std_arr, r=std_r, d=std_d, gamma=std_gamma) == np.array([225, 6084]))
+            polynomial_kernel(std_arr, std_arr, r=std_r, d=std_d, gamma=std_gamma) == np.array(
+                [[225, 1089], [1089, 6084]]))
         assert np.all(
-            polynomial_kernel(std_arr[0, :], std_arr, r=std_r, d=std_d, gamma=std_gamma) == np.array([225, 1089]))
+            polynomial_kernel(std_arr[0, :], std_arr, r=std_r, d=std_d, gamma=std_gamma) == np.array([[225, 1089]]))
         assert np.all(
-            polynomial_kernel(std_arr, std_arr[0, :], r=std_r, d=std_d, gamma=std_gamma) == np.array([225, 1089]))
+            polynomial_kernel(std_arr, std_arr[0, :], r=std_r, d=std_d, gamma=std_gamma) == np.array([[225], [1089]]))
         assert np.all(
             polynomial_kernel(std_arr[0, :], std_arr[0, :], r=std_r, d=std_d, gamma=std_gamma) == np.array([225]))
 
