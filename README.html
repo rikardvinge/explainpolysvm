@@ -690,9 +690,12 @@ feature_selection = es.feature_selection(n_interactions = 10)
 # Select 60% of the features based on importance
 feature_selection = es.feature_selection(frac_interactions = 0.6)
 
-# Select the most important features that correspond to 99% of the total decision function
+# Select features that sum to 99% of the sum of all feature importances
 feature_selection = es.feature_selection(frac_importance = 0.99)
 </pre>
+</div>
+<div class="section" id="toy-example">
+<h1>Toy example</h1>
 </div>
 </div>
 </body>

@@ -604,7 +604,7 @@ class ExPSVM:
                                                      reduce_memory=reduce_memory, mask=mask)
         return np.sum(dot_prod, axis=1, keepdims=False)
 
-    def feature_importance(self, sort: bool = True, **kwargs):
+    def feature_importance(self, sort: bool = True, format_names: bool = False, **kwargs):
         """
         Calculate feature importance and return feature importance, feature names and sorting order.
 
@@ -612,6 +612,8 @@ class ExPSVM:
         ----------
         sort : Boolean
             If True (default) sort the features in order of importance.
+        format_names : Boolean
+            If True, format interaction strings using format_interaction_names().
         kwargs : Arguments passed to get_linear_model.
 
         Returns
@@ -623,12 +625,16 @@ class ExPSVM:
         sort_order : Numpy ndarray of shape (n_interactions,)
             Sorting order to get feat_names from _interactions.
         """
+
+        feat_importance = np.squeeze(np.abs(self.get_linear_model(**kwargs)[:, 0]))
         if sort:
-            sort_order = np.argsort(np.squeeze(self.get_linear_model(**kwargs)))  # [::-1]
+            sort_order = np.argsort(feat_importance)[::-1]
         else:
-            sort_order = np.arange(self._interactions.size)
-        feat_importance = np.abs(self.get_linear_model(**kwargs)[sort_order, 0])
+            sort_order = np.arange(feat_importance.size)
+        feat_importance = feat_importance[sort_order]
         feat_names = self.get_interactions(**kwargs)[sort_order]
+        if format_names:
+            feat_names = self. format_interaction_names(feat_names)
         return feat_importance, feat_names, sort_order
 
     def feature_selection(self, n_interactions: int = None,
@@ -735,4 +741,3 @@ class ExPSVM:
                  for i, c in enumerate(counts)])
             formatted_strs.append(counts_str)
         return formatted_strs
-
