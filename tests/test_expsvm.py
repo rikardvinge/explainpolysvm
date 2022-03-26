@@ -500,16 +500,27 @@ class TestExPSVM:
 
         # Test sorted with all features
         feat_imp, feat, _ = es.feature_importance()
-        sort_order = np.argsort(true_lin_model)[::-1]
+        sort_order = np.argsort(true_lin_model)
         assert np.all(feat_imp == true_lin_model[sort_order])
         assert np.all(feat == std_idx[sort_order])
 
         # Test sorted with mask
         es.interaction_mask = std_mask
         feat_imp, feat, _ = es.feature_importance(mask=True)
-        sort_order = np.argsort(true_lin_model[std_mask])[::-1]
+        sort_order = np.argsort(true_lin_model[std_mask])
         assert np.all(feat_imp == true_lin_model[std_mask][sort_order])
         assert np.all(feat == std_idx[std_mask][sort_order])
+
+    def test_format_interaction_names(self, std_p, std_idx):
+        """
+        Check that formatting of interaction strings returns correctly formatted strings.
+        """
+        es = exp.ExPSVM(sv=None, dual_coef=None,
+                        kernel_d=None, kernel_r=None, kernel_gamma=None,
+                        p=std_p, intercept=None)
+        formatted_strs = es.format_interaction_names(std_idx)
+        assert np.all(formatted_strs == np.array(['x_{0}', 'x_{1}', 'x_{2}', 'x_{0}^2', 'x_{0}x_{1}', 'x_{0}x_{2}',
+                                                  'x_{1}^2', 'x_{1}x_{2}', 'x_{2}^2']))
 
     def test_feature_selection(self, std_p, std_d, std_r, std_arr, std_gamma,
                                std_dual_coef, std_lin_model):
@@ -523,7 +534,7 @@ class TestExPSVM:
                         p=std_p, intercept=None)
         es.transform_svm()
 
-        sorted_lm = np.sort(true_lin_model)[::-1]
+        sorted_lm = np.sort(true_lin_model)
 
         # Test n_feat
         mask = es.feature_selection(n_interactions=3)
@@ -573,7 +584,7 @@ class TestExPSVM:
 
         # Test feature selection with fraction of importance selected
         true_lin_model = np.squeeze(std_lin_model)
-        sorted_lm = np.sort(true_lin_model)[::-1]
+        sorted_lm = np.sort(true_lin_model)
         frac_feat_imp = 0.5
         mask = es.feature_selection(frac_importance=frac_feat_imp)
         cs = np.cumsum(sorted_lm) / (np.cumsum(sorted_lm)[-1])

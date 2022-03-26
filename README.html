@@ -645,64 +645,11 @@ span.boxed, span.framebox {
 
 <p>Welcome to ExplainPolySVM, a python package for feature importance analysis and feature selection
 for SVM models trained using the polynomial kernel</p>
-<p><span class="formula"><i>K</i><sub><i>p</i></sub>(<i>x</i>, <i>y</i>|<i>r</i>, <i>D</i>, <i>γ</i>) = (<i>r</i> + <i>γ</i>(<i>x</i><sup><i>T</i></sup><i>y</i>))<sup><i>D</i></sup></span>,</p>
-<p>on a binary classification problem. Here <span class="formula"><i>x</i></span> and <span class="formula"><i>y</i></span> are column vectors and <span class="formula"><i>r</i></span>, <span class="formula"><i>γ</i></span>
-and <span class="formula"><i>D</i></span> are the independent term, scale coefficient and the degree of the polynomial kernel, respectively.</p>
-<p>To express feature importance, the trained SVM model,</p>
-<p><span class="formula"><i>f</i>(<i>x</i>) = <span class="limits"><span class="limit">∑</span></span><sub><i>i</i> ∈ <i>sv</i></sub><i>α</i><sub><i>i</i></sub><i>y</i><sub><i>i</i></sub><i>K</i><sub><i>p</i></sub>(<i>x</i><sub><i>i</i></sub>, <i>x</i>|<i>r</i>, <i>D</i>, <i>γ</i>) + <i>b</i><sub>0</sub></span></p>
-<p>is transformed into a compressed linear model of the form</p>
-<p><span class="formula"><i>f</i>(<i>x</i>) = <span class="limits"><span class="limit">∑</span></span><sub><i>d</i> = 1</sub><sup><i>D</i></sup><span class="array"><span class="arrayrow"><span class="bracket align-left">⎛</span></span><span class="arrayrow"><span class="bracket align-left">⎜</span></span><span class="arrayrow"><span class="bracket align-left">⎝</span></span></span><span class="array"><span class="arrayrow">
-<span class="arraycell align-c">
-<i>D</i>
-</span>
-
-</span>
-<span class="arrayrow">
-<span class="arraycell align-c">
- 
-</span>
-
-</span>
-<span class="arrayrow">
-<span class="arraycell align-c">
-<i>d</i>
-</span>
-
-</span>
-</span><span class="array"><span class="arrayrow"><span class="bracket align-right">⎞</span></span><span class="arrayrow"><span class="bracket align-right">⎟</span></span><span class="arrayrow"><span class="bracket align-right">⎠</span></span></span><i>r</i><sup><i>D</i> − <i>d</i></sup><span class="symbol">(</span><i>p</i><sub><i>d</i></sub>⊙<span class="limits"><span class="limit">∑</span></span><sub><i>i</i> ∈ <i>sv</i></sub><i>α</i><sub><i>i</i></sub><i>y</i><sub><i>i</i></sub><i>φ</i>(<i>x</i><sub><i>i</i></sub>|<i>d</i>)<span class="symbol">)</span><sup><i>T</i></sup><i>φ</i>(<i>x</i>|<i>d</i>)</span>.</p>
-<p>The transformation <span class="formula"><i>φ</i>(<i>x</i>|<i>d</i>)</span> contains all unique degree-<span class="formula"><i>d</i></span> interactions of the features of <span class="formula"><i>x</i></span>.
-For example, <span class="formula"><i>φ</i>(<i>x</i>|2) = [<i>x</i><sub>0</sub><i>x</i><sub>0</sub>, <i>x</i><sub>0</sub><i>x</i><sub>1</sub>, <i>x</i><sub>0</sub><i>x</i><sub>2</sub>, <i>x</i><sub>1</sub><i>x</i><sub>1</sub>, <i>x</i><sub>1</sub><i>x</i><sub>2</sub>, <i>x</i><sub>2</sub><i>x</i><sub>2</sub>]<sup><i>T</i></sup></span> for <span class="formula"><i>x</i> ∈ ℝ<sup>3</sup></span>.
-Note that interactions <span class="formula"><i>x</i><sub>1</sub><i>x</i><sub>0</sub>, <i>x</i><sub>2</sub><i>x</i><sub>0</sub>, <i>x</i><sub>2</sub><i>x</i><sub>1</sub></span> are not included. This is due to the symmetry of the polynomial
-kernel, namely that all permutations of the order in the interaction are identical, e.g. <span class="formula"><i>x</i><sub>2</sub><i>x</i><sub>0</sub> = <i>x</i><sub>0</sub><i>x</i><sub>2</sub></span>.
-To avoid expressing all interactions, only unique are included in <span class="formula"><i>φ</i>(<i>x</i>|<i>d</i>)</span>. To achieve an equivalent decision
-function, the interactions in <span class="formula"><i>φ</i>(<i>x</i>|<i>d</i>)</span> are element-wise multiplied by the number of permutations of each
-interaction. The number of permutations for each interaction is stored in <span class="formula"><i>p</i><sub><i>d</i></sub></span>. For the quadratic example above
-<span class="formula"><i>p</i><sub><i>d</i></sub> = [1, 2, 2, 1, 2, 1]<sup><i>T</i></sup></span>. The number of permutations is given by <span class="formula"><i>d</i>! ⁄ (<i>n</i><sub>1</sub>!<i>n</i><sub>2</sub>!...<i>n</i><sub><i>p</i></sub>!)</span> where
-<span class="formula"><i>p</i> : <i>x</i> ∈ ℝ<sup><i>p</i></sup></span> and <span class="formula"><i>n</i><sub><i>i</i></sub></span> is the number of occurrences of feature <span class="formula"><i>i</i></span> in the interaction.
-Note that <span class="formula"><i>n</i><sub>1</sub> + <i>n</i><sub>2</sub> + ... + <i>n</i><sub><i>p</i></sub> = <i>d</i></span>. For example, the interaction <span class="formula"><i>x</i><sub>2</sub><i>x</i><sub>3</sub><i>x</i><sub>2</sub><i>x</i><sub>8</sub><i>x</i><sub>10</sub></span> has degree 5 and
-feature occurrences <span class="formula"><i>n</i><sub>2</sub> = 2</span>, <span class="formula"><i>n</i><sub>3</sub> = 1</span>, <span class="formula"><i>n</i><sub>4</sub> = 1</span>, <span class="formula"><i>n</i><sub>5</sub> = 1</span>, and, thus, the number of permutations
-<span class="formula"><i>n</i><sub>2</sub> = 2</span>.</p>
-<p>Feature importance is provided by simply concatenating the terms
-<span class="formula"><span class="array"><span class="arrayrow"><span class="bracket align-left">⎛</span></span><span class="arrayrow"><span class="bracket align-left">⎜</span></span><span class="arrayrow"><span class="bracket align-left">⎝</span></span></span><span class="array"><span class="arrayrow">
-<span class="arraycell align-c">
-<i>D</i>
-</span>
-
-</span>
-<span class="arrayrow">
-<span class="arraycell align-c">
- 
-</span>
-
-</span>
-<span class="arrayrow">
-<span class="arraycell align-c">
-<i>d</i>
-</span>
-
-</span>
-</span><span class="array"><span class="arrayrow"><span class="bracket align-right">⎞</span></span><span class="arrayrow"><span class="bracket align-right">⎟</span></span><span class="arrayrow"><span class="bracket align-right">⎠</span></span></span><i>r</i><sup><i>D</i> − <i>d</i></sup><span class="symbol">(</span><i>p</i><sub><i>d</i></sub>⊙<span class="limits"><span class="limit">∑</span></span><sub><i>i</i> ∈ <i>sv</i></sub><i>α</i><sub><i>i</i></sub><i>y</i><sub><i>i</i></sub><i>φ</i>(<i>x</i><sub><i>i</i></sub>|<i>d</i>)<span class="symbol">)</span></span>
-for all <span class="formula"><i>d</i> = 1...<i>D</i></span>.</p>
+<p><span class="formula"><i>K</i><sub><i>p</i></sub>(<i>x</i>, <i>y</i>|<i>r</i>, <i>D</i>, <i>c</i>) = (<i>r</i> + <i>c</i>(<i>x</i><sup><i>T</i></sup><i>y</i>))<sup><i>D</i></sup></span>,</p>
+<p>on a binary classification problem. Here <span class="formula"><i>x</i></span> and <span class="formula"><i>y</i></span> are column vectors and <span class="formula"><i>r</i></span>, <span class="formula"><i>c</i></span>,
+and <span class="formula"><i>D</i></span> are the independent term, scale coefficient and the degree of the polynomial kernel, respectively.
+The greek letter gamma is often used for <span class="formula"><i>c</i></span>.</p>
+<p>To express feature importance, the trained SVM model Is transformed into a compressed linear model.</p>
 <div class="section" id="usage">
 <h1>Usage</h1>
 <p><strong>The ExPSVM module</strong></p>
@@ -725,6 +672,26 @@ es.transform_svm()
 <pre class="code literal-block">
 import expsvm
 es = expsvm.ExPSVM(svc_model=svc_model, transform=True)
+</pre>
+<p>Feature importance is retrieved by</p>
+<pre class="code literal-block">
+feat_importance, feat_names = es.feature_importance()
+</pre>
+<p>where <code>feat_importance</code> and <code>feat_names</code> are both Numpy ndarrays; the former containing the importance of
+each feature and the latter contains names of the features, detailes about which interaction the feature correspond to.
+Feature names are returned as strings of the form <code>i,j,k,l,...</code>, where <code>i</code>, <code>j</code>, <code>k</code>, <code>l</code>
+are integers in the range <span class="formula">[1, <i>p</i>]</span> where <cite>p</cite> is the number of features in the original space. For example, the
+interaction '0,1,0,2,2' correspond to the interaction :math:<a href="#id1"><span class="problematic" id="id2">`</span></a>x0^2*x1*x2^2'.</p>
+<p>Features can be selected based on their contributions to the decision function. Three selection rules are provided.</p>
+<pre class="code literal-block">
+# Select the 1 most important features
+feature_selection = es.feature_selection(n_interactions = 10)
+
+# Select 60% of the features based on importance
+feature_selection = es.feature_selection(frac_interactions = 0.6)
+
+# Select the most important features that correspond to 99% of the total decision function
+feature_selection = es.feature_selection(frac_importance = 0.99)
 </pre>
 </div>
 </div>

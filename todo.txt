@@ -2,3 +2,4 @@ Write README
 Add build functionality
 Add docs
 Add requirements file - done
+Write feature name cleanup

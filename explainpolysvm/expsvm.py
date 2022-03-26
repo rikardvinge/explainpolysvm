@@ -27,6 +27,7 @@ class InteractionUtils:
         Number of features in original space.
 
     """
+
     def __init__(self, interaction_dim: int, n_feature: int) -> None:
         self.interaction_dim = interaction_dim
         self.n_feature = n_feature
@@ -623,7 +624,7 @@ class ExPSVM:
             Sorting order to get feat_names from _interactions.
         """
         if sort:
-            sort_order = np.argsort(np.squeeze(self.get_linear_model(**kwargs)))[::-1]
+            sort_order = np.argsort(np.squeeze(self.get_linear_model(**kwargs)))  # [::-1]
         else:
             sort_order = np.arange(self._interactions.size)
         feat_importance = np.abs(self.get_linear_model(**kwargs)[sort_order, 0])
@@ -675,7 +676,7 @@ class ExPSVM:
             n_interactions = self._interactions.size
 
         interaction_mask = np.full((self._interactions.size,), False)
-        interaction_mask[sort_order[:n_interactions]] = True
+        interaction_mask[sort_order[0:n_interactions]] = True
         return interaction_mask
 
     def set_mask(self, mask: np.ndarray = None, interaction_strs: List[str] = None, **kwargs):
@@ -705,3 +706,33 @@ class ExPSVM:
                 self.interaction_mask = self.get_interaction_index(interaction_strs=interaction_strs)
         else:
             self.interaction_mask = self.feature_selection(**kwargs)
+
+    def format_interaction_names(self, interaction_strs: List[str]) -> List[str]:
+        """
+        Return formatted interaction strings from 'i,i,j,k' to 'x_{i}^2x_{j}x_{k}'. Excludes unused features.
+
+        Example:
+        The interaction_strs = ['0,0,1', '0,1,2', '0,1,0,2'] is returned as ['x_{0}^2x_{1}', 'x_{0}x_{1}x_{2}',
+        'x_{0}^2x_{1}x_2'].
+
+        Parameters
+        ----------
+        interaction_strs : List[str]
+            List of interactions strings formatted as returned by InteractionUtils.create_unique_index().
+
+        Returns
+        -------
+        formatted_strs : List[str]
+            List of formatted interaction strings.
+        """
+        interactions = [[int(ind) for ind in ind_str.split(',')] for ind_str in interaction_strs]
+        formatted_strs = []
+        for interaction in interactions:
+            indices = np.arange(self.p)
+            counts = [np.count_nonzero(interaction == ind) for ind in indices]
+            counts_str = ''.join(
+                ['x_{{{}}}^{}'.format(i, c) if c > 1 else 'x_{{{}}}'.format(i) if c == 1 else ''
+                 for i, c in enumerate(counts)])
+            formatted_strs.append(counts_str)
+        return formatted_strs
+
