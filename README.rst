@@ -4,7 +4,7 @@ ExplainPolySVM
 Welcome to ExplainPolySVM, a python package for feature importance analysis and feature selection
 for SVM models trained using the polynomial kernel
 
-:math:`K_p(x,y|r,D,g)=(r+g(x^T y))^D`,
+:math:`K_p(x,y|r,D,g)=(r+g(x^Ty))^D`,
 
 on a binary classification problem. Here :math:`x` and :math:`y` are column vectors and :math:`r`, :math:`g`,
 and :math:`D` are the independent term, scale coefficient and the degree of the polynomial kernel, respectively.
@@ -73,10 +73,10 @@ In this toy example, a two-dimensional binary classification problem is generate
 within the unit circle, and the negative class within the ring with minimum radius 1 and maximum radous 1.41. From each
 class, 100 training samples are generated. An example dataset is visualized here
 
-.. image:: ./examples/2d_rings.png
+.. image:: ./examples/2d_rings/training_data.png
 
 An SVM with a quadratic kernel is trained using the manually set
-hyperparameters :math:`C=0.9`, :math:`g='scale'` from Scikit-learn's SVC implementation, and :math:`r=2^{0.5}`.
+hyperparameters :math:`C=0.9`, :math:`g='scale'` from Scikit-learn's SVC implementation, and :math:`r=2^0.5`.
 
 The test performance on a 50-sample, balanced, test set is around 0.96-1.
 
