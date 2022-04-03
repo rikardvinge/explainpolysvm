@@ -75,6 +75,7 @@ class, 100 training samples are generated. An example dataset is visualized here
 
 .. figure:: ./examples/2d_rings/training_data.png
     :figwidth: 40%
+    :scale: 40%
 
 An SVM with a quadratic kernel is trained using the manually set
 hyperparameters :math:`C=0.9`, :math:`g='scale'` from Scikit-learn's SVC implementation, and :math:`r=2^0.5`.
@@ -112,6 +113,7 @@ The resulting feature importance from a random sampling of the training set is
 
 .. figure:: ./examples/2d_rings/feature_importance.png
     :figwidth: 40%
+    :scale: 40%
 
 As we hoped for, the model learned to differentiate the two datasets through mainly the two interactions :math:`x0x0`
 and :math:`x1x1`.
