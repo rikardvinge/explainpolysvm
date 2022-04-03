@@ -74,6 +74,7 @@ within the unit circle, and the negative class within the ring with minimum radi
 class, 100 training samples are generated. An example dataset is visualized here
 
 .. image:: ./examples/2d_rings/training_data.png
+    :scale: 0.5
 
 An SVM with a quadratic kernel is trained using the manually set
 hyperparameters :math:`C=0.9`, :math:`g='scale'` from Scikit-learn's SVC implementation, and :math:`r=2^0.5`.
@@ -106,5 +107,11 @@ The trained SVM feature importance is achieved using the following code
 
     feat_importance, feat_names, sort_order = es.feature_importance(format_names=True)
 
-With the resulting feature importance
+The resulting feature importance from a random sampling of the training set is
+
+.. image:: ./examples/2d_rings/feature_importance.png
+    :scale: 0.5
+
+As we hoped for, the model learned to differentiate the two datasets through mainly the two interactions :math:`x0x0`
+and :math:`x1x1`.
 
