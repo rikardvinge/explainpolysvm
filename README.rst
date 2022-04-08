@@ -23,6 +23,13 @@ To install, clone the repository and install via pip while standing in the folde
 
     pip install ./expsvm
 
+For developers it is recommended to install the module in edit mode including the "dev" extras to get the correct
+version of pytest.
+
+.. code-block::
+
+    pip install -e "./expsvm[dev]"
+
 Binary installers to be added later.
 
 Usage
