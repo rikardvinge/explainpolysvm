@@ -12,6 +12,19 @@ The greek letter gamma is often used for :math:`g`.
 
 To express feature importance, the trained SVM model Is transformed into a compressed linear model.
 
+Where to get
+------------
+
+The source code is currently hosted on GitHub at: https://github.com/rikvinge/expsvm
+
+To install, clone the repository and install via pip while standing in the folder containing expsvm
+
+.. code-block::
+
+    pip install ./expsvm
+
+Binary installers to be added later.
+
 Usage
 ------------------
 
@@ -106,7 +119,7 @@ The trained SVM feature importance is achieved using the following code
     import numpy as np
     import matplotlib.pyplot as plt
     from sklearn.svm import SVC
-    
+
     from explainpolysvm import expsvm
 
     # Fit SVM

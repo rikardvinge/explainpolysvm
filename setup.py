@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='ExplainPolySVM',
+    name='explainpolysvm',
     version='0.1',
     description='Module for feature importance extraction and feature selection for Support Vector Machines trained with polynomial kernels.',
     long_description=open('README.rst').read(),
