@@ -11,10 +11,7 @@ setup(
     license='BSD 3',
     packages=find_packages(),
     install_requires=['numpy>=1.21.5', 'scikit-learn>=1.0.2'],
-    extras_requires={
-        'test': ['pytest>=6.2.5'],
-        'examples': ['matplotlib']
-        },
+    extras_requires={'dev': ['pytest>=6.2.5', 'matplotlib']},
     keywords=['feature importance', 'support vector machine', 'svm', 'feature selection', 'polynomial kernel'],
     classifiers= [
         'Development Status :: 4 - Beta',
