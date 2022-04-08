@@ -103,8 +103,10 @@ The trained SVM feature importance is achieved using the following code
 
 .. code-block::
 
+    import numpy as np
     import matplotlib.pyplot as plt
     from sklearn.svm import SVC
+    
     from explainpolysvm import expsvm
 
     # Fit SVM
