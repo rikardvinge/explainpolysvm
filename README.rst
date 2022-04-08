@@ -86,6 +86,10 @@ The trained SVM feature importance is achieved using the following code
 
 .. code-block::
 
+    import matplotlib.pyplot as plt
+    from sklearn.svm import SVC
+    from explainpolysvm import expsvm
+
     # Fit SVM
     C = 0.9
     degree = 2
@@ -93,7 +97,7 @@ The trained SVM feature importance is achieved using the following code
     r = np.sqrt(2)
 
     # Fit SVM
-    from sklearn.svm import SVC
+
     kernel = 'poly'
     model = SVC(C=C, kernel=kernel, degree=degree, gamma=gamma, coef0=r)
     model.fit(X_train, y_train)
@@ -111,7 +115,6 @@ The trained SVM feature importance is achieved using the following code
     feat_importance, feat_names, _ = es.feature_importance(format_names=True)
 
     # Plot
-    import matplotlib.pyplot as plt
     fig, ax = plt.subplots(1,1, figsize=(5,5))
     ax.bar(x=np.arange(feat_importance.size), height=feat_importance, tick_label=['${}$'.format(name) for name in feat_names])
     plt.xlabel('Interaction')
