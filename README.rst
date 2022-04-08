@@ -63,12 +63,18 @@ To return formatted feature names, use
 
     feat_importance, formatted_feat_names, sort_order = es.feature_importance(format_names=True)
 
-
-Features can be selected based on their contributions to the decision function. Three selection rules are provided.
+Or, to format an existing feature name list
 
 .. code-block::
 
-    # Select the 1 most important features
+    formatted_feat_names = es.format_interaction_names(unformatted_feat_names)
+
+Feature selection can be applied based on the contributions to the decision function. Three selection rules are
+provided.
+
+.. code-block::
+
+    # Select the 10 most important features
     feature_selection = es.feature_selection(n_interactions = 10)
 
     # Select 60% of the features based on importance
