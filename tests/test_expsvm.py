@@ -519,8 +519,8 @@ class TestExPSVM:
                         kernel_d=None, kernel_r=None, kernel_gamma=None,
                         p=std_p, intercept=None)
         formatted_strs = es.format_interaction_names(std_idx)
-        assert np.all(formatted_strs == np.array(['x_{0}', 'x_{1}', 'x_{2}', 'x_{0}^2', 'x_{0}x_{1}', 'x_{0}x_{2}',
-                                                  'x_{1}^2', 'x_{1}x_{2}', 'x_{2}^2']))
+        assert np.all(formatted_strs == np.array(['x_{0}', 'x_{1}', 'x_{2}', 'x_{0}^{2}', 'x_{0}x_{1}', 'x_{0}x_{2}',
+                                                  'x_{1}^{2}', 'x_{1}x_{2}', 'x_{2}^{2}']))
     #
     def test_feature_selection(self, std_p, std_d, std_r, std_arr, std_gamma,
                                std_dual_coef, std_lin_model):

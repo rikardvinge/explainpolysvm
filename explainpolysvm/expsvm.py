@@ -715,11 +715,11 @@ class ExPSVM:
 
     def format_interaction_names(self, interaction_strs: List[str]) -> List[str]:
         """
-        Return formatted interaction strings from 'i,i,j,k' to 'x_{i}^2x_{j}x_{k}'. Excludes unused features.
+        Return formatted interaction strings from 'i,i,j,k' to 'x_{i}^{2}x_{j}x_{k}'. Excludes unused features.
 
         Example:
-        The interaction_strs = ['0,0,1', '0,1,2', '0,1,0,2'] is returned as ['x_{0}^2x_{1}', 'x_{0}x_{1}x_{2}',
-        'x_{0}^2x_{1}x_2'].
+        The interaction_strs = ['0,0,1', '0,1,2', '0,1,0,2'] is returned as ['x_{0}^{2}x_{1}', 'x_{0}x_{1}x_{2}',
+        'x_{0}^{2}x_{1}x_2'].
 
         Parameters
         ----------
@@ -737,7 +737,7 @@ class ExPSVM:
             indices = np.arange(self.p)
             counts = [np.count_nonzero(interaction == ind) for ind in indices]
             counts_str = ''.join(
-                ['x_{{{}}}^{}'.format(i, c) if c > 1 else 'x_{{{}}}'.format(i) if c == 1 else ''
+                ['x_{{{}}}^{{{}}}'.format(i, c) if c > 1 else 'x_{{{}}}'.format(i) if c == 1 else ''
                  for i, c in enumerate(counts)])
             formatted_strs.append(counts_str)
         return formatted_strs

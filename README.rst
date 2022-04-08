@@ -45,13 +45,24 @@ Feature importance is retrieved by
 
 .. code-block::
 
-    feat_importance, feat_names = es.feature_importance()
+    feat_importance, feat_names, sort_order = es.feature_importance()
 
-where :code:`feat_importance` and :code:`feat_names` are both Numpy ndarrays; the former containing the importance of
-each feature and the latter contains names of the features, detailes about which interaction the feature correspond to.
+where :code:`feat_importance`, :code:`feat_names`, and :code:`sort_order` are all Numpy ndarrays.
+:code:`feat_importance` contains the importance ofeach feature. :code:`feat_names` contains names of the features,
+detailes about which interaction the feature correspond to. :code:`sort_order` provides the ordering of the interactions
+to reorder the interactions returned by es.get_interactions() to the same order as returned by es.feature_importance().
 Feature names are returned as strings of the form :code:`i,j,k,l,...`, where :code:`i`, :code:`j`, :code:`k`, :code:`l`
 are integers in the range :math:`[1,p]` where `p` is the number of features in the original space. For example, the
-interaction '0,1,0,2,2' correspond to the interaction :math:`x0^2*x1*x2^2`.
+interaction '0,1,0,2,2' correspond to the interaction :math:`x0^2*x1*x2^2`. Alternatively, setting the
+flag :code:`format_names=True` returns the feature names as formatted strings that are suitable for plotting. For
+example, the interaction '0,1,0,2,2' is returned as 'x_{0}^{2}x_{1}x_{2}^{2}'.
+
+To return formatted feature names, use
+
+.. code-block::
+
+    feat_importance, formatted_feat_names, sort_order = es.feature_importance(format_names=True)
+
 
 Features can be selected based on their contributions to the decision function. Three selection rules are provided.
 
