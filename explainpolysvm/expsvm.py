@@ -570,7 +570,7 @@ class ExPSVM:
 
         # Compute the dependent components of the decision functions. These are the element-wise multiplications
         # of the observations and the linear model.
-        df_comp = np.multiply(x_trans, np.transpose(self.get_linear_model()))
+        df_comp = np.multiply(x_trans, np.transpose(self.get_linear_model(mask=use_mask)))
 
         # Prepend the independent component, the SVM intercept.
         df_comp = np.concatenate((self.intercept * np.ones((x.shape[0], 1)), df_comp), axis=1)

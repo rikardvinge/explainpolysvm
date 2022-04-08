@@ -1,2 +1,2 @@
-import context
-import test_expsvm
+# import .context
+from .test_expsvm import TestExPSVM

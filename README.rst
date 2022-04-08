@@ -71,7 +71,7 @@ Example usage
 
 In this toy example, a two-dimensional binary classification problem is generated such that the positive class lies
 within the unit circle, and the negative class within the ring with minimum radius 1 and maximum radous 1.41. From each
-class, 100 training samples are generated. An example dataset is visualized here
+class, 100 training samples are generated. An example dataset is visualized to the right.
 
 .. image:: ./examples/2d_rings/training_data.png
     :width: 8cm
@@ -80,7 +80,7 @@ class, 100 training samples are generated. An example dataset is visualized here
 An SVM with a quadratic kernel is trained using the manually set
 hyperparameters :math:`C=0.9`, :math:`g='scale'` from Scikit-learn's SVC implementation, and :math:`r=2^0.5`.
 
-The test performance on a 50-sample, balanced, test set is around 0.96-1.
+The test performance on a 50-sample, balanced, test set is around 0.96.
 
 The trained SVM feature importance is achieved using the following code
 
@@ -93,6 +93,7 @@ The trained SVM feature importance is achieved using the following code
     r = np.sqrt(2)
 
     # Fit SVM
+    from sklearn.svm import SVC
     kernel = 'poly'
     model = SVC(C=C, kernel=kernel, degree=degree, gamma=gamma, coef0=r)
     model.fit(X_train, y_train)
@@ -102,20 +103,47 @@ The trained SVM feature importance is achieved using the following code
     intercept = model.intercept_[0]
     kernel_gamma = model._gamma
 
+    # Extract feature importance
     es = expsvm.ExPSVM(sv=sv, dual_coef=dual_coef, intercept=intercept,
                     kernel_d=degree, kernel_r=r, kernel_gamma=kernel_gamma)
     es.transform_svm()
 
-    feat_importance, feat_names, sort_order = es.feature_importance(format_names=True)
+    feat_importance, feat_names, _ = es.feature_importance(format_names=True)
+
+    # Plot
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(1,1, figsize=(5,5))
+    ax.bar(x=np.arange(feat_importance.size), height=feat_importance, tick_label=['${}$'.format(name) for name in feat_names])
+    plt.xlabel('Interaction')
+    plt.ylabel('Decision function weight')
+    plt.draw()
 
 The resulting feature importance from a random sampling of the training set is
-
 
 .. image:: ./examples/2d_rings/feature_importance.png
     :width: 8cm
     :height: 8cm
-    :align: left
 
 As we hoped for, the model learned to differentiate the two datasets through mainly the two interactions :math:`x0x0`
 and :math:`x1x1`.
+
+To investigate if selecting only the top-2 interactions, i.e. :math:`x0x0`
+and :math:`x1x1`, improves performance, we can use the following code
+
+.. code-block::
+
+    # Performance without mask
+    y_pred = np.sign(es.decision_function(x=X_test))
+    acc = np.sum(y_pred==y_test)/y_test.size
+
+    # Set mask containing only the top-2 interactions
+    es.set_mask(n_interactions=2)
+
+    # Performance with mask
+    y_pred_masked = np.sign(es.decision_function(x=X_test,mask=True))
+    acc_masked = np.sum(y_pred_masked==y_test)/y_test.size
+
+In one example run of the above training set and 2000 test samples we achieved a performance without feature selection
+:code:`acc=0.976` and with feature selection of the top-2 interactions :code:`acc_masked=0.988`.
+
 
