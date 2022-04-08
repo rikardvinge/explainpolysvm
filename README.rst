@@ -51,7 +51,7 @@ where :code:`feat_importance` and :code:`feat_names` are both Numpy ndarrays; th
 each feature and the latter contains names of the features, detailes about which interaction the feature correspond to.
 Feature names are returned as strings of the form :code:`i,j,k,l,...`, where :code:`i`, :code:`j`, :code:`k`, :code:`l`
 are integers in the range :math:`[1,p]` where `p` is the number of features in the original space. For example, the
-interaction '0,1,0,2,2' correspond to the interaction :math:`x0^2*x1*x2^2'.
+interaction '0,1,0,2,2' correspond to the interaction :math:`x0^2*x1*x2^2`.
 
 Features can be selected based on their contributions to the decision function. Three selection rules are provided.
 
