@@ -3,9 +3,10 @@ from setuptools import setup, find_packages
 setup(
     name='explainpolysvm',
     version='0.1',
-    description='Module for feature importance extraction and feature selection for Support Vector Machines trained with polynomial kernels.',
+    description='Module for feature importance extraction and feature selection for Support Vector Machines trained '
+                'with polynomial kernels.',
     long_description=open('README.rst').read(),
-    url='https://github.com/rikvinge/expsvm',
+    url='https://github.com/rikvinge/https://github.com/rikardvinge/explainpolysvm',
     author='Rikard Vinge',
     author_email='rikard.vinge.github@gmail.com',
     license='BSD 3',
@@ -13,7 +14,7 @@ setup(
     install_requires=['numpy>=1.21.5', 'scikit-learn>=1.0.2'],
     extras_require={'dev': ['pytest>=6.2.5', 'matplotlib']},
     keywords=['feature importance', 'support vector machine', 'svm', 'feature selection', 'polynomial kernel'],
-    classifiers= [
+    classifiers=[
         'Development Status :: 4 - Beta',
         'Programming Language :: Python :: 3',
         "Intended Audience :: Developers",

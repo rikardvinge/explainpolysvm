@@ -114,7 +114,7 @@ In this toy example, a two-dimensional binary classification problem is generate
 within the unit circle, and the negative class within the ring with minimum radius 1 and maximum radous 1.41. From each
 class, 100 training samples are generated. An example dataset is visualized to the right.
 
-.. image:: ./examples/2d_rings/training_data.png
+.. image:: ./docs/source/media/training_data.png
     :width: 8cm
     :height: 8cm
 
@@ -166,7 +166,7 @@ The trained SVM feature importance is achieved using the following code
 
 The resulting feature importance from a random sampling of the training set is
 
-.. image:: ./examples/2d_rings/feature_importance.png
+.. image:: ./docs/source/media/feature_importance.png
     :width: 8cm
     :height: 8cm
 
