@@ -6,11 +6,11 @@ for SVM models trained using the polynomial kernel
 
 :math:`K_p(x,y|r,D,g)=(r+g(x^Ty))^D`,
 
-on a binary classification problem. Here :math:`x` and :math:`y` are column vectors and :math:`r`, :math:`g`,
+on binary classification problems. Here :math:`x` and :math:`y` are column vectors and :math:`r`, :math:`g`,
 and :math:`D` are the independent term, scale coefficient and the degree of the polynomial kernel, respectively.
 The greek letter gamma is often used for :math:`g`.
 
-To express feature importance, the trained SVM model Is transformed into a compressed linear model.
+To express feature importance, the trained SVM model is transformed into a compressed linear version of the polynomial transformation assumed in the polynomial kernel.
 
 Where to get
 ------------
@@ -23,7 +23,7 @@ To install, clone the repository and install via pip while standing in the folde
 
     pip install ./expsvm
 
-For developers it is recommended to install the module in edit mode including the "dev" extras to get the correct
+To contribute to the development, it is recommended to install the module in edit mode including the "dev" extras to get the correct
 version of pytest.
 
 .. code-block::
@@ -103,6 +103,10 @@ provided.
     # Select features that sum to 99% of the sum of all feature importances
     feature_selection = es.feature_selection(frac_importance = 0.99)
 
+**A word of caution**
+
+Under the hood, this module calculates a compressed version of the full polynomial transformation of the polynomial kernel. Without compresseion, the number of interactions in this transformation is of order :math:`O(p^d)`, where :math:`p` is the number of features in the original space, and :math:`d` the polynomial degree of the kernel. The compression reduces the number of interactions by keeping only one copy of each unique interaction. Even so, it is not recommended to use too large :math:`p` or :math:`d`.
+
 Example usage
 -------------
 
@@ -169,8 +173,8 @@ The resulting feature importance from a random sampling of the training set is
 As we hoped for, the model learned to differentiate the two datasets through mainly the two interactions :math:`x0x0`
 and :math:`x1x1`.
 
-To investigate if selecting only the top-2 interactions, i.e. :math:`x0x0`
-and :math:`x1x1`, improves performance, we can use the following code
+To investigate whether selecting only the top-2 interactions, i.e. :math:`x0x0`
+and :math:`x1x1`, improves performance, the following code can be used.
 
 .. code-block::
 
@@ -185,7 +189,13 @@ and :math:`x1x1`, improves performance, we can use the following code
     y_pred_masked = np.sign(es.decision_function(x=X_test,mask=True))
     acc_masked = np.sum(y_pred_masked==y_test)/y_test.size
 
-In one example run of the above training set and 2000 test samples we achieved a performance without feature selection
-:code:`acc=0.976` and with feature selection of the top-2 interactions :code:`acc_masked=0.988`.
+Future development
+------------------
 
+Below is a non-exhaustive list of useful and interesting features that could be added to the module.
 
+- Add support for general polynomial kernels. In the current state, only the standard polynomial kernel is implemented; but any arbitrary polynomial kernel is expressable in the same way as the standard kernel. The only requirement this module have is that we can express any coefficients that are multiplied to the sum of the transformed support vectors and to keep track of the number of duplicates of the interactions.
+- Add support for multi-class problems.
+- Add support for the RBF Kernel by truncating the corresponding power series.
+- Investigation if Least-square SVM, support vector regression, etc. can be expressed in similar terms as the standard SVM.
+- 
