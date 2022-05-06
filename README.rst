@@ -114,7 +114,7 @@ In this toy example, a two-dimensional binary classification problem is generate
 within the unit circle, and the negative class within the ring with minimum radius 1 and maximum radous 1.41. From each
 class, 100 training samples are generated. An example dataset is visualized to the right.
 
-.. image:: ./docs/source/media/training_data.png
+.. image:: ./docs/source/media/training_data_2d.png
     :width: 8cm
     :height: 8cm
 
@@ -166,7 +166,7 @@ The trained SVM feature importance is achieved using the following code
 
 The resulting feature importance from a random sampling of the training set is
 
-.. image:: ./docs/source/media/feature_importance.png
+.. image:: ./docs/source/media/feature_importance_2d.png
     :width: 8cm
     :height: 8cm
 
@@ -188,6 +188,24 @@ and :math:`x1x1`, improves performance, the following code can be used.
     # Performance with mask
     y_pred_masked = np.sign(es.decision_function(x=X_test,mask=True))
     acc_masked = np.sum(y_pred_masked==y_test)/y_test.size
+	
+In our second example, we modify the previous dataset in two ways:
+
+- Add overlap between the classes by expanding the inner circle to radius 1.05 and the outer ring's inner diameter to 0.95.
+- Add a third dimension. Both classes are sampled randomly within [-2,2].
+
+Thus, we came the classes sampled from a cylinder and a tube, respectively. 
+The classes are designed to be separated in the radial direction in the first two dimensions, and the third dimension should be non-informative. 
+Below the dataset and the found feature importance are presented
+
+.. image:: ./docs/source/media/training_data_3d.png
+    :width: 8cm
+    :height: 8cm
+.. image:: ./docs/source/media/feature_importance_3d.png
+    :width: 8cm
+    :height: 8cm
+	
+Also in this simple example, the trained SVM has learned to mainly use the radial distance in the first two dimensions.
 
 Future development
 ------------------
@@ -198,4 +216,3 @@ Below is a non-exhaustive list of useful and interesting features that could be 
 - Add support for multi-class problems.
 - Add support for the RBF Kernel by truncating the corresponding power series.
 - Investigation if Least-square SVM, support vector regression, etc. can be expressed in similar terms as the standard SVM.
-- 
