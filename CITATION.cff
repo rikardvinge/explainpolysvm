@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: Vinge
+    given-names: Rikard
+    orcid: https://orcid.org/0000-0002-7306-3403
+title: "ExplainPolySVM"
+version: 0.1
+doi: ADD THROUGH ZENODO WHEN PUBLISHING REPO https://github.com/CABAH/assignDOI
+date-released: 2022-05-06
