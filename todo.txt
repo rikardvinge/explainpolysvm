@@ -1,8 +1,0 @@
-Write README = done
-Add build functionality
-Add docs
-Add requirements file - done
-Write feature name cleanup - done
-Change github name to vingeman
-change repo name to explainpolysvm
-Test building. Maybe Jens can do this?

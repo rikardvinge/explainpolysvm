@@ -10,30 +10,30 @@ on binary classification problems. Here :math:`x` and :math:`y` are column vecto
 and :math:`D` are the independent term, scale coefficient and the degree of the polynomial kernel, respectively.
 The greek letter gamma is often used for :math:`g`.
 
-To express feature importance, the trained SVM model is transformed into a compressed linear version of the polynomial transformation assumed in the polynomial kernel.
+To express feature importance, the trained SVM model is transformed into a compressed linear version of the polynomial transformation used in the polynomial kernel.
 
 Where to get
 ------------
 
-The source code is currently hosted on GitHub at: https://github.com/rikvinge/expsvm
+The source code is currently hosted on GitHub at: https://github.com/rikvinge/explainpolysvm
 
-To install, clone the repository and install via pip while standing in the folder containing expsvm
+To install, clone the repository and install via pip while standing in the folder containing the explainpolysvm folder, using the command
 
 .. code-block::
 
-    pip install ./expsvm
+    pip install ./explainpolysvm
 
 To contribute to the development, it is recommended to install the module in edit mode including the "dev" extras to get the correct
 version of pytest.
 
 .. code-block::
 
-    pip install -e "./expsvm[dev]"
+    pip install -e "./explainpolysvm[dev]"
 
 Binary installers to be added later.
 
 Usage
-------------------
+-----
 
 **The ExPSVM module**
 
@@ -73,8 +73,8 @@ detailes about which interaction the feature correspond to. :code:`sort_order` p
 to reorder the interactions returned by es.get_interactions() to the same order as returned by es.feature_importance().
 Feature names are returned as strings of the form :code:`i,j,k,l,...`, where :code:`i`, :code:`j`, :code:`k`, :code:`l`
 are integers in the range :math:`[1,p]` where `p` is the number of features in the original space. For example, the
-interaction '0,1,0,2,2' correspond to the interaction :math:`x0^2*x1*x2^2`. Alternatively, setting the
-flag :code:`format_names=True` returns the feature names as formatted strings that are suitable for plotting. For
+interaction '0,1,0,2,2' correspond to the interaction :math:`x0^2*x1*x2^2`.
+Alternatively, setting the flag :code:`format_names=True` returns the feature names as formatted strings that are suitable for plotting. For
 example, the interaction '0,1,0,2,2' is returned as 'x_{0}^{2}x_{1}x_{2}^{2}'.
 
 To return formatted feature names, use
@@ -90,7 +90,7 @@ Or, to format an existing feature name list
     formatted_feat_names = es.format_interaction_names(unformatted_feat_names)
 
 Feature selection can be applied based on the contributions to the decision function. Three selection rules are
-provided.
+currently implemented.
 
 .. code-block::
 
@@ -105,16 +105,16 @@ provided.
 
 **A word of caution**
 
-Under the hood, this module calculates a compressed version of the full polynomial transformation of the polynomial kernel. Without compresseion, the number of interactions in this transformation is of order :math:`O(p^d)`, where :math:`p` is the number of features in the original space, and :math:`d` the polynomial degree of the kernel. The compression reduces the number of interactions by keeping only one copy of each unique interaction. Even so, it is not recommended to use too large :math:`p` or :math:`d`.
+Under the hood, ExPSVM calculates a compressed version of the full polynomial transformation of the polynomial kernel. Without compression, the number of interactions in this transformation is of order :math:`O(p^d)`, where :math:`p` is the number of features in the original space, and :math:`d` the polynomial degree of the kernel. The compression reduces the number of interactions by keeping only one copy of each unique interaction. Even so, it is not recommended to use too large :math:`p` or :math:`d`.
 
 Example usage
 -------------
 
 In this toy example, a two-dimensional binary classification problem is generated such that the positive class lies
 within the unit circle, and the negative class within the ring with minimum radius 1 and maximum radous 1.41. From each
-class, 100 training samples are generated. An example dataset is visualized to the right.
+class, 100 training samples are generated. An example dataset is visualized below.
 
-.. image:: ./docs/source/media/training_data_2d.png
+.. image:: ./examples/2d_rings/training_data_2d.png
     :width: 8cm
     :height: 8cm
 
@@ -166,7 +166,7 @@ The trained SVM feature importance is achieved using the following code
 
 The resulting feature importance from a random sampling of the training set is
 
-.. image:: ./docs/source/media/feature_importance_2d.png
+.. image:: ./examples/2d_rings/feature_importance_2d.png
     :width: 8cm
     :height: 8cm
 
@@ -189,30 +189,47 @@ and :math:`x1x1`, improves performance, the following code can be used.
     y_pred_masked = np.sign(es.decision_function(x=X_test,mask=True))
     acc_masked = np.sum(y_pred_masked==y_test)/y_test.size
 	
-In our second example, we modify the previous dataset in two ways:
+In a second example, we expand the problem slightly by modifying the previous dataset in two ways:
 
-- Add overlap between the classes by expanding the inner circle to radius 1.05 and the outer ring's inner diameter to 0.95.
+- Add overlap between the classes by setting the inner circle radius to 1.05 and the outer ring's inner radius to 0.95.
 - Add a third dimension. Both classes are sampled randomly within [-2,2].
 
-Thus, we came the classes sampled from a cylinder and a tube, respectively. 
-The classes are designed to be separated in the radial direction in the first two dimensions, and the third dimension should be non-informative. 
+Thus, the classes are sampled from a cylinder and a tube, respectively.
+The classes are designed to be relatively well-separated in the radial direction in the first two dimensions, and the third dimension should be non-informative.
 Below the dataset and the found feature importance are presented
 
-.. image:: ./docs/source/media/training_data_3d.png
+.. image:: ./examples/3d_tubes/training_data_3d.png
     :width: 8cm
     :height: 8cm
-.. image:: ./docs/source/media/feature_importance_3d.png
+.. image:: ./examples/3d_tubes/feature_importance_3d.png
     :width: 8cm
     :height: 8cm
 	
 Also in this simple example, the trained SVM has learned to mainly use the radial distance in the first two dimensions.
 
+Further reading
+---------------
+
+For detailed information about the underlying theory of ExPSVM, please refer to |location_link|.
+
+.. |location_link| raw:: html
+
+   <a href="https://github.com/rikardvinge/explainpolysvm/blob/main/Polynomial_SVM_feature_importance_and_selection.pdf" target="_blank">Polynomial_SVM_feature_importance_and_selection.pdf</a>
+
+A note on package maintenance
+-----------------------------
+
+So far, ExplainPolySVM is developed as a hobby project by a single author. No promises will be made on maintenance nor expansions of this package.
+Feel free to fork, PR, and please let me know if you are interested in continuing it's development!
+
 Future development
 ------------------
 
-Below is a non-exhaustive list of useful and interesting features that could be added to the module.
+Below is a non-exhaustive list of useful and interesting features to add to the module.
 
 - Add support for general polynomial kernels. In the current state, only the standard polynomial kernel is implemented; but any arbitrary polynomial kernel is expressable in the same way as the standard kernel. The only requirement this module have is that we can express any coefficients that are multiplied to the sum of the transformed support vectors and to keep track of the number of duplicates of the interactions.
 - Add support for multi-class problems.
 - Add support for the RBF Kernel by truncating the corresponding power series.
-- Investigation if Least-square SVM, support vector regression, etc. can be expressed in similar terms as the standard SVM.
+- Investigate if Least-square SVM, support vector regression, one-class SVM, etc. can be expressed in similar terms as done in this project for the standard SVM.
+
+

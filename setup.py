@@ -6,7 +6,7 @@ setup(
     description='Module for feature importance extraction and feature selection for Support Vector Machines trained '
                 'with polynomial kernels.',
     long_description=open('README.rst').read(),
-    url='https://github.com/rikvinge/https://github.com/rikardvinge/explainpolysvm',
+    url='https://github.com/rikardvinge/explainpolysvm',
     author='Rikard Vinge',
     author_email='rikard.vinge.github@gmail.com',
     license='BSD 3',
