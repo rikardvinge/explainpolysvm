@@ -604,7 +604,7 @@ class ExPSVM:
                                                      reduce_memory=reduce_memory, mask=mask)
         return np.sum(dot_prod, axis=1, keepdims=False)
 
-    def feature_importance(self, sort: bool = True, format_names: bool = False, **kwargs):
+    def feature_importance(self, sort: bool = True, format_names: bool = False, magnitude=True, **kwargs):
         """
         Calculate feature importance and return feature importance, feature names and sorting order.
 
@@ -614,6 +614,9 @@ class ExPSVM:
             If True (default) sort the features in order of importance.
         format_names : Boolean
             If True, format interaction strings using format_interaction_names().
+        magnitude : Boolean
+            If True (default) return the absolute value of the feature importance, otherwise return the signed
+            importance.
         kwargs : Arguments passed to get_linear_model.
 
         Returns
@@ -627,15 +630,20 @@ class ExPSVM:
         """
 
         feat_importance = np.squeeze(np.abs(self.get_linear_model(**kwargs)[:, 0]))
+        feat_importance_signed = np.squeeze(self.get_linear_model(**kwargs)[:, 0])
         if sort:
             sort_order = np.argsort(feat_importance)[::-1]
         else:
             sort_order = np.arange(feat_importance.size)
         feat_importance = feat_importance[sort_order]
+        feat_importance_signed = feat_importance_signed[sort_order]
         feat_names = self.get_interactions(**kwargs)[sort_order]
         if format_names:
             feat_names = self. format_interaction_names(feat_names)
-        return feat_importance, feat_names, sort_order
+        if magnitude:
+            return feat_importance, feat_names, sort_order
+        else:
+            return feat_importance_signed, feat_names, sort_order
 
     def feature_selection(self, n_interactions: int = None,
                           frac_interactions: float = None,

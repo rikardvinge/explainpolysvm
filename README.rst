@@ -170,11 +170,11 @@ The resulting feature importance from a random sampling of the training set is
     :width: 8cm
     :height: 8cm
 
-As we hoped for, the model learned to differentiate the two datasets through mainly the two interactions :math:`x0x0`
-and :math:`x1x1`.
+As we hoped for, the model learned to differentiate the two datasets through mainly the two interactions :math:`x0^2`
+and :math:`x1^2`.
 
-To investigate whether selecting only the top-2 interactions, i.e. :math:`x0x0`
-and :math:`x1x1`, improves performance, the following code can be used.
+To investigate whether selecting only the top-2 interactions, i.e. :math:`x0^2`
+and :math:`x1^2`, improves performance, the following code can be used.
 
 .. code-block::
 
@@ -206,6 +206,32 @@ Below the dataset and the found feature importance are presented
     :height: 8cm
 	
 Also in this simple example, the trained SVM has learned to mainly use the radial distance in the first two dimensions.
+
+Looking at a single observation, we can extract the components of the decision function using
+
+.. code-block::
+
+    x = X_test[0,:]
+    y_comp, feat_names = es.decision_function_components(x=x, output_interaction_names=True)
+
+In the example run, the observation is of class -1 and has features [-1.03208377, -0.28655351, 1.72734955]. With a radial
+distance to the :math:`x2`-axis of 1.28 it is therefore well within the class -1 region.
+The decision score for this observation is -1.5, correctly classified as belonging to class -1.
+The contributions to the decision of this observataion is presented in the figure below.
+
+.. image:: ./examples/3d_tubes/feature_importance_single_3d.png
+    :width: 8cm
+    :height: 8cm
+
+The absolute strongest constribution is from :math:`x0^2`, a reasonable result given the strong weight on the
+interaction :math:`x0^2` as well on this observation's relatively large value in this feature. Although the observation
+has a higher value in feature :math:`x2`, this feature plays little role in the decision.
+
+Given that the two main interactions, :math:`x0^2` and :math:`x1^2`, are always positive and that
+the support vectors shoudl have a radial distance to the :math:`x2`-axis aroudn 0.95-1.05, the value of
+:math:`x0^2+x1^2` for a support vector should be about 3.5, we can guess that the constant of the SVM model also
+should be in the neighbourhood of 3.5. Indeed, the constant in the trained SVM model is 3.4. Depending on which
+class is labels as -1 and +1, the sign of the constant and the weights of :math:`x0^2` and :math:`x1^2` will change.
 
 Further reading
 ---------------
