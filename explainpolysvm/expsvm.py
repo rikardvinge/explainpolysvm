@@ -442,7 +442,10 @@ class ExPSVM:
 
                 # Reshape into (1, n_interactions) if needed.
                 if len(feat_trans.shape) == 1:
-                    feat_trans = np.reshape(feat_trans, (1, feat_trans.shape[0]))
+                    if len(d_idx)==1:
+                        feat_trans = np.reshape(feat_trans, (feat_trans.shape[0],1))
+                    else:
+                        feat_trans = np.reshape(feat_trans, (1, feat_trans.shape[0]))
                 transformation[d] = feat_trans
             else:
                 transformation[d] = np.array([])
@@ -571,7 +574,6 @@ class ExPSVM:
         # Compute the dependent components of the decision functions. These are the element-wise multiplications
         # of the observations and the linear model.
         df_comp = np.multiply(x_trans, np.transpose(self.get_linear_model(mask=use_mask)))
-
         # Prepend the independent component, the SVM intercept.
         df_comp = np.concatenate((self.intercept * np.ones((x.shape[0], 1)), df_comp), axis=1)
         if output_interaction_names:

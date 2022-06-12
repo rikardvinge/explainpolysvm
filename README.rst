@@ -13,7 +13,7 @@ The greek letter gamma is often used for :math:`g`.
 To express feature importance, the trained SVM model is transformed into a compressed linear version of the polynomial transformation used in the polynomial kernel.
 
 Where to get
-------------
+============
 
 The source code is currently hosted on GitHub at: https://github.com/rikvinge/explainpolysvm
 
@@ -33,7 +33,7 @@ version of pytest.
 Binary installers to be added later.
 
 Usage
------
+=====
 
 **The ExPSVM module**
 
@@ -105,16 +105,23 @@ currently implemented.
 
 **A word of caution**
 
-Under the hood, ExPSVM calculates a compressed version of the full polynomial transformation of the polynomial kernel. Without compression, the number of interactions in this transformation is of order :math:`O(p^d)`, where :math:`p` is the number of features in the original space, and :math:`d` the polynomial degree of the kernel. The compression reduces the number of interactions by keeping only one copy of each unique interaction. Even so, it is not recommended to use too large :math:`p` or :math:`d`.
+Under the hood, ExPSVM calculates a compressed version of the full polynomial transformation of the polynomial kernel.
+Without compression, the number of interactions in this transformation is of order :math:`O(p^d)`, where :math:`p` is
+the number of features in the original space, and :math:`d` the polynomial degree of the kernel.
+The compression reduces the number of interactions by keeping only one copy of each unique interaction, with a
+compression ratio of :math:`d!:1`. Even so, it is not recommended to use too large :math:`p` or :math:`d`.
 
 Example usage
--------------
+=============
+
+Feature importance
+------------------
 
 In this toy example, a two-dimensional binary classification problem is generated such that the positive class lies
 within the unit circle, and the negative class within the ring with minimum radius 1 and maximum radous 1.41. From each
 class, 100 training samples are generated. An example dataset is visualized below.
 
-.. image:: ./examples/2d_rings/training_data_2d.png
+.. image:: ./examples/2d_rings/images/training_data_2d.png
     :width: 8cm
     :height: 8cm
 
@@ -166,7 +173,7 @@ The trained SVM feature importance is achieved using the following code
 
 The resulting feature importance from a random sampling of the training set is
 
-.. image:: ./examples/2d_rings/feature_importance_2d.png
+.. image:: ./examples/2d_rings/images/feature_importance_2d.png
     :width: 8cm
     :height: 8cm
 
@@ -198,14 +205,21 @@ Thus, the classes are sampled from a cylinder and a tube, respectively.
 The classes are designed to be relatively well-separated in the radial direction in the first two dimensions, and the third dimension should be non-informative.
 Below the dataset and the found feature importance are presented
 
-.. image:: ./examples/3d_tubes/training_data_3d.png
+.. image:: ./examples/3d_tubes/images/training_data_3d.png
     :width: 8cm
     :height: 8cm
-.. image:: ./examples/3d_tubes/feature_importance_3d.png
+.. image:: ./examples/3d_tubes/images/feature_importance_3d.png
     :width: 8cm
-    :height: 8cm
+    :height: 5cm
 	
 Also in this simple example, the trained SVM has learned to mainly use the radial distance in the first two dimensions.
+
+We find an interesting interplay between the constant and the two dominating interactions. The constant :math:`c` is
+approximately 3.4, the same magnitude, but opposite sign, to the weight :math:`w_{0,0}` and :math:`w_{1,1}` of the two
+dominating interactions. Given that the overlap between the classes reside in the region with a radial distance to
+the :math:`x2`-axis between 0.95 and 1.05, we expect the support vectors to have :math:`x0^2+x1^2\approx 1`. As we have
+two interactions that dominate the decifion function by one order of magnitude to the other interactions, it is
+logical that we find that these two interactions relate to the contant as :math:`c+w_{0,0}x0^2+w_{1,1}x1^2\approx 0`.
 
 Looking at a single observation, we can extract the components of the decision function using
 
@@ -214,27 +228,39 @@ Looking at a single observation, we can extract the components of the decision f
     x = X_test[0,:]
     y_comp, feat_names = es.decision_function_components(x=x, output_interaction_names=True)
 
-In the example run, the observation is of class -1 and has features [-1.03208377, -0.28655351, 1.72734955]. With a radial
-distance to the :math:`x2`-axis of 1.28 it is therefore well within the class -1 region.
-The decision score for this observation is -1.5, correctly classified as belonging to class -1.
+In the example run, the observation is of class -1 and has features [-0.044, 1.136, -0.304]. With a radial
+distance to the :math:`x2`-axis of 1.137 it is therefore well within the class -1 region.
+The decision score for this observation is -1.4, correctly classified as belonging to class -1.
 The contributions to the decision of this observataion is presented in the figure below.
 
-.. image:: ./examples/3d_tubes/feature_importance_single_3d.png
+.. image:: ./examples/3d_tubes/images/feature_importance_single_3d.png
     :width: 8cm
-    :height: 8cm
+    :height: 5cm
 
-The absolute strongest constribution is from :math:`x0^2`, a reasonable result given the strong weight on the
-interaction :math:`x0^2` as well on this observation's relatively large value in this feature. Although the observation
-has a higher value in feature :math:`x2`, this feature plays little role in the decision.
+The absolute strongest constribution is from :math:`x1^2`, a reasonable result given the strong weight on the
+interaction :math:`x1^2` as well on this observation's relatively large value in this feature.
 
-Given that the two main interactions, :math:`x0^2` and :math:`x1^2`, are always positive and that
-the support vectors shoudl have a radial distance to the :math:`x2`-axis aroudn 0.95-1.05, the value of
-:math:`x0^2+x1^2` for a support vector should be about 3.5, we can guess that the constant of the SVM model also
-should be in the neighbourhood of 3.5. Indeed, the constant in the trained SVM model is 3.4. Depending on which
-class is labels as -1 and +1, the sign of the constant and the weights of :math:`x0^2` and :math:`x1^2` will change.
+Feature selection
+-----------------
+
+In the feature selection example, we take the 3d case from above and step by step drop the least important interactions.
+In total, there are 19 interactions in thecompressed linear model for a problem with three features and a polynomial
+degree of three.
+
+The results are presented as a boxplot of 100 testsets, each containing 500 observations per class, while the number
+of interactions is incrementally reduced by order of least importance. We find a small by gradual increase in median
+classification accruacy, as well as a slight reduction in the variation of the accuracy. We also find that when dropping
+the 18th feature, i.e. the second most important, performance drops to slightly abvoe chance. This is due to dropping
+of the two most important interactions, :math:`x1^2`, which is known to play a vital role in the separation of the two
+classes.
+
+.. image:: ./examples/3d_tubes/images/feature_selection_3d.png
+    :width: 8cm
+    :height: 5cm
+
 
 Further reading
----------------
+===============
 
 For detailed information about the underlying theory of ExPSVM, please refer to |location_link|.
 
@@ -243,13 +269,13 @@ For detailed information about the underlying theory of ExPSVM, please refer to 
    <a href="https://github.com/rikardvinge/explainpolysvm/blob/main/Polynomial_SVM_feature_importance_and_selection.pdf" target="_blank">Polynomial_SVM_feature_importance_and_selection.pdf</a>
 
 A note on package maintenance
------------------------------
+=============================
 
 So far, ExplainPolySVM is developed as a hobby project by a single author. No promises will be made on maintenance nor expansions of this package.
 Feel free to fork, PR, and please let me know if you are interested in continuing it's development!
 
 Future development
-------------------
+==================
 
 Below is a non-exhaustive list of useful and interesting features to add to the module.
 
