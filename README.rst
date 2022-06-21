@@ -247,11 +247,11 @@ In the feature selection example, we take the 3d case from above and step by ste
 In total, there are 19 interactions in thecompressed linear model for a problem with three features and a polynomial
 degree of three.
 
-The results are presented as a boxplot of 100 testsets, each containing 500 observations per class, while the number
+The results are presented as a boxplot of 100 test sets, each containing 500 observations per class, while the number
 of interactions is incrementally reduced by order of least importance. We find a small by gradual increase in median
 classification accruacy, as well as a slight reduction in the variation of the accuracy. We also find that when dropping
-the 18th feature, i.e. the second most important, performance drops to slightly abvoe chance. This is due to dropping
-of the two most important interactions, :math:`x1^2`, which is known to play a vital role in the separation of the two
+the 18th feature, i.e. the second most important, performance drops to slightly abvoe chance. This is due to dropping one
+of the two most important interactions, :math:`x1^2`, which we know plays a vital role in the separation of the two
 classes.
 
 .. image:: ./examples/3d_tubes/images/feature_selection_3d.png
