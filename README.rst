@@ -15,7 +15,7 @@ To express feature importance, the trained SVM model is transformed into a compr
 Where to get
 ============
 
-The source code is currently hosted on GitHub at: https://github.com/rikvinge/explainpolysvm
+The source code is currently hosted on GitHub at: https://github.com/rikardvinge/explainpolysvm
 
 To install, clone the repository and install via pip while standing in the folder containing the explainpolysvm folder, using the command
 
@@ -43,7 +43,7 @@ starting-point, a transformed SVM model using :code:`ExPSVM` can be achieved by
 
 .. code-block::
 
-    import expsvm
+    from explainpolysvm import expsvm
     sv = svc_model.support_vectors_
     dual_coef = svc_model.dual_coef_
     intercept = svc_model.intercept_
@@ -58,7 +58,7 @@ Or, simply
 
 .. code-block::
 
-    import expsvm
+    from explainpolysvm import expsvm
     es = expsvm.ExPSVM(svc_model=svc_model, transform=True)
 
 Feature importance is retrieved by
