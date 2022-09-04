@@ -15,7 +15,7 @@ To express feature importance, the trained SVM model is transformed into a compr
 Where to get
 ============
 
-The source code is currently hosted on GitHub at: https://github.com/rikvinge/explainpolysvm
+The source code is currently hosted on GitHub at: https://github.com/rikardvinge/explainpolysvm
 
 To install, clone the repository and install via pip while standing in the folder containing the explainpolysvm folder, using the command
 
@@ -68,8 +68,8 @@ Feature importance is retrieved by
     feat_importance, feat_names, sort_order = es.feature_importance()
 
 where :code:`feat_importance`, :code:`feat_names`, and :code:`sort_order` are all Numpy ndarrays.
-:code:`feat_importance` contains the importance ofeach feature. :code:`feat_names` contains names of the features,
-detailes about which interaction the feature correspond to. :code:`sort_order` provides the ordering of the interactions
+:code:`feat_importance` contains the importance of each feature. :code:`feat_names` contains names of the features,
+details about which interaction the feature correspond to. :code:`sort_order` provides the ordering of the interactions
 to reorder the interactions returned by es.get_interactions() to the same order as returned by es.feature_importance().
 Feature names are returned as strings of the form :code:`i,j,k,l,...`, where :code:`i`, :code:`j`, :code:`k`, :code:`l`
 are integers in the range :math:`[1,p]` where `p` is the number of features in the original space. For example, the
@@ -118,7 +118,7 @@ Feature importance
 ------------------
 
 In this toy example, a two-dimensional binary classification problem is generated such that the positive class lies
-within the unit circle, and the negative class within the ring with minimum radius 1 and maximum radous 1.41. From each
+within the unit circle, and the negative class within the ring with minimum radius 1 and maximum radius 1.41. From each
 class, 100 training samples are generated. An example dataset is visualized below.
 
 .. image:: ./examples/2d_rings/images/training_data_2d.png
@@ -215,11 +215,11 @@ Below the dataset and the found feature importance are presented
 Also in this simple example, the trained SVM has learned to mainly use the radial distance in the first two dimensions.
 
 We find an interesting interplay between the constant and the two dominating interactions. The constant :math:`c` is
-approximately 3.4, the same magnitude, but opposite sign, to the weight :math:`w_{0,0}` and :math:`w_{1,1}` of the two
+approximately 3.5, approximately the same, but opposite sign, to the weight :math:`w_{0,0}` and :math:`w_{1,1}` of the two
 dominating interactions. Given that the overlap between the classes reside in the region with a radial distance to
 the :math:`x2`-axis between 0.95 and 1.05, we expect the support vectors to have :math:`x0^2+x1^2\approx 1`. As we have
-two interactions that dominate the decifion function by one order of magnitude to the other interactions, it is
-logical that we find that these two interactions relate to the contant as :math:`c+w_{0,0}x0^2+w_{1,1}x1^2\approx 0`.
+two interactions that dominate the decision function by one order of magnitude to the other interactions, it is
+logical that we find that these two interactions relate to the constant as :math:`c+w_{0,0}x0^2+w_{1,1}x1^2\approx 0`.
 
 Looking at a single observation, we can extract the components of the decision function using
 
@@ -228,31 +228,30 @@ Looking at a single observation, we can extract the components of the decision f
     x = X_test[0,:]
     y_comp, feat_names = es.decision_function_components(x=x, output_interaction_names=True)
 
-In the example run, the observation is of class -1 and has features [-0.044, 1.136, -0.304]. With a radial
-distance to the :math:`x2`-axis of 1.137 it is therefore well within the class -1 region.
-The decision score for this observation is -1.4, correctly classified as belonging to class -1.
-The contributions to the decision of this observataion is presented in the figure below.
+In the example run, the observation is of class -1 and has features [0.356, -1.352, 0.592]. With a radial
+distance to the :math:`x2`-axis of 1.398 it is therefore well within the class -1 region.
+The decision score for this observation is -4.6, correctly classifying it as belonging to class -1.
+The contributions to the decision of this observation is presented in the figure below.
 
 .. image:: ./examples/3d_tubes/images/feature_importance_single_3d.png
     :width: 8cm
     :height: 5cm
 
-The absolute strongest constribution is from :math:`x1^2`, a reasonable result given the strong weight on the
+The absolute strongest contribution is from :math:`x1^2`, a reasonable result given the strong weight on the
 interaction :math:`x1^2` as well on this observation's relatively large value in this feature.
 
 Feature selection
 -----------------
 
 In the feature selection example, we take the 3d case from above and step by step drop the least important interactions.
-In total, there are 19 interactions in thecompressed linear model for a problem with three features and a polynomial
+In total, there are 19 interactions in the compressed linear model for a problem with three features and a polynomial
 degree of three.
 
-The results are presented as a boxplot of 100 testsets, each containing 500 observations per class, while the number
-of interactions is incrementally reduced by order of least importance. We find a small by gradual increase in median
-classification accruacy, as well as a slight reduction in the variation of the accuracy. We also find that when dropping
-the 18th feature, i.e. the second most important, performance drops to slightly abvoe chance. This is due to dropping
-of the two most important interactions, :math:`x1^2`, which is known to play a vital role in the separation of the two
-classes.
+The results are presented as a boxplot of 100 test sets, each containing 500 observations per class, while the number
+of interactions is reduced by order of least importance. We find a small by gradual increase in median
+classification accuracy, as well as a slight reduction in the variation of the accuracy from 0.0083 to 0.0071. We also find that when dropping
+the 18th feature, i.e. the second most important, performance drops to slightly above chance. This is due to dropping
+of the two most important interactions, :math:`x1^2`.
 
 .. image:: ./examples/3d_tubes/images/feature_selection_3d.png
     :width: 8cm
@@ -271,7 +270,7 @@ For detailed information about the underlying theory of ExPSVM, please refer to 
 A note on package maintenance
 =============================
 
-So far, ExplainPolySVM is developed as a hobby project by a single author. No promises will be made on maintenance nor expansions of this package.
+So far, ExplainPolySVM is developed as a hobby project by a single person. No promises will be made on maintenance nor expansions of this package.
 Feel free to fork, PR, and please let me know if you are interested in continuing it's development!
 
 Future development
@@ -279,7 +278,7 @@ Future development
 
 Below is a non-exhaustive list of useful and interesting features to add to the module.
 
-- Add support for general polynomial kernels. In the current state, only the standard polynomial kernel is implemented; but any arbitrary polynomial kernel is expressable in the same way as the standard kernel. The only requirement this module have is that we can express any coefficients that are multiplied to the sum of the transformed support vectors and to keep track of the number of duplicates of the interactions.
+- Add support for general polynomial kernels. In the current state, only the standard polynomial kernel is implemented; but any arbitrary polynomial kernel is expressible in the same way as the standard kernel. The only requirement this module have is that we can express any coefficients that are multiplied to the sum of the transformed support vectors and to keep track of the number of duplicates of the interactions.
 - Add support for multi-class problems.
 - Add support for the RBF Kernel by truncating the corresponding power series.
 - Investigate if Least-square SVM, support vector regression, one-class SVM, etc. can be expressed in similar terms as done in this project for the standard SVM.

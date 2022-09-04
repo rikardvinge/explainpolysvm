@@ -7,6 +7,8 @@ from sklearn.svm import SVC
 from sklearn.model_selection import train_test_split
 from typing import Tuple
 
+# Create random number generator for repeatable tests.
+rng = np.random.default_rng(101)
 
 @pytest.fixture
 def std_p():
@@ -415,19 +417,19 @@ class TestExPSVM:
         constant = std_intercept - std_r ** std_d
 
         # Test single vector
-        arr = np.random.randn(1, 3)
+        arr = rng.standard_normal(size=(1, 3))
         assert np.abs(es.decision_function(arr) -
                       (polynomial_kernel(sv, arr, r=std_r, d=std_d, gamma=std_gamma) + constant)
                       ) < tol
 
         # Test 2d array
-        arr = np.random.randn(2, 3)
+        arr = rng.standard_normal(size=(2, 3))
         assert np.all(np.abs(es.decision_function(arr) -
                              (polynomial_kernel(sv, arr, r=std_r, d=std_d, gamma=std_gamma) + constant)
                              ) < tol)
 
         # Test 3d array. Should raise value error
-        arr = np.random.randn(2, 3, 1)
+        arr = rng.standard_normal(size=(2, 3, 1))
         with pytest.raises(ValueError):
             es.decision_function(arr)
 
@@ -610,12 +612,12 @@ class TestExPSVM:
         r_max2 = 1.41
 
         # Sample from classes
-        phi_train1 = 2 * np.pi * np.random.rand(n_train_per_class)
-        r_train1 = r_min1 + (r_max1 - r_min1) * np.random.rand(n_train_per_class, 1)
+        phi_train1 = 2 * np.pi * rng.random(size=n_train_per_class)
+        r_train1 = r_min1 + (r_max1 - r_min1) * rng.random(size=(n_train_per_class, 1))
         X_train1 = np.multiply(r_train1, np.transpose(np.array((np.cos(phi_train1), np.sin(phi_train1)))))
 
-        phi_train2 = 2 * np.pi * np.random.rand(n_train_per_class)
-        r_train2 = r_min2 + (r_max2 - r_min2) * np.random.rand(n_train_per_class, 1)
+        phi_train2 = 2 * np.pi * rng.random(size=n_train_per_class)
+        r_train2 = r_min2 + (r_max2 - r_min2) * rng.random(size=(n_train_per_class, 1))
         X_train2 = np.multiply(r_train2, np.transpose(np.array((np.cos(phi_train2), np.sin(phi_train2)))))
 
         X = np.concatenate((X_train1, X_train2), axis=0)

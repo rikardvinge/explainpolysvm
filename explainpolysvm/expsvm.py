@@ -1,3 +1,34 @@
+# BSD 3-Clause License
+#
+# Copyright (c) 2022, Rikard Vinge
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice, this
+#    list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+# 3. Neither the name of the copyright holder nor the names of its
+#    contributors may be used to endorse or promote products derived from
+#    this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
 from math import comb
 import numpy as np
 import itertools as it
@@ -211,7 +242,7 @@ class ExPSVM:
             Parameters are extracted automatically from the SVC object.
 
         transform : bool
-            Set to True to transform SVM model at creation of ExPSVM object. Otherwise, a call to transfrom_svm()
+            Set to True to transform SVM model at creation of ExPSVM object. Otherwise, a call to transform_svm()
             is required. The transformation is done using transform_svm() without any input and may become
             computationally heavy if kernel dimension and the number of features are large. Default is False.
 
@@ -442,8 +473,8 @@ class ExPSVM:
 
                 # Reshape into (1, n_interactions) if needed.
                 if len(feat_trans.shape) == 1:
-                    if len(d_idx)==1:
-                        feat_trans = np.reshape(feat_trans, (feat_trans.shape[0],1))
+                    if len(d_idx) == 1:
+                        feat_trans = np.reshape(feat_trans, (feat_trans.shape[0], 1))
                     else:
                         feat_trans = np.reshape(feat_trans, (1, feat_trans.shape[0]))
                 transformation[d] = feat_trans

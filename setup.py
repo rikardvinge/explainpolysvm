@@ -2,13 +2,13 @@ from setuptools import setup, find_packages
 
 setup(
     name='explainpolysvm',
-    version='0.1',
+    version='0.2',
     description='Module for feature importance extraction and feature selection for Support Vector Machines trained '
                 'with polynomial kernels.',
     long_description=open('README.rst').read(),
     url='https://github.com/rikardvinge/explainpolysvm',
     author='Rikard Vinge',
-    author_email='rikard.vinge.github@gmail.com',
+    author_email='research@riakrdvinge.se',
     license='BSD 3',
     packages=find_packages(),
     install_requires=['numpy>=1.21.5', 'scikit-learn>=1.0.2'],
