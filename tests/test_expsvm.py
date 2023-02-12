@@ -399,7 +399,7 @@ class TestExPSVM:
 
         Author's note: It was at this test that I first was able to test that compressing the high-dimensional linear
         model produce identical result to the polynomial kernel. After thinking and writing equations as a hobby for two
-        years, that this test passing feels wonderful.
+        years, that this test passes feels wonderful.
         It works!
         """
         dual_coef = np.array([[1.]])  # Set to 1 to ignore effect of slack and class labels.
@@ -451,7 +451,7 @@ class TestExPSVM:
 
         true_components = np.multiply(exp.dict2array(std_transf_dict), np.transpose(std_lin_model))
         true_components = np.concatenate((np.array([[const], [const]]), true_components), axis=1)
-        true_feat = np.concatenate((np.array(['constant']), std_idx))
+        true_feat = np.concatenate((np.array(['intercept']), std_idx))
         test_comp, test_feat = es.decision_function_components(std_arr, output_interaction_names=True)
         assert np.all(test_comp == true_components)
         assert np.all(test_feat == true_feat)
@@ -462,7 +462,7 @@ class TestExPSVM:
         true_components = np.multiply(exp.dict2array(std_transf_dict), np.transpose(std_lin_model))
         true_components = true_components[:, std_mask]
         true_components = np.concatenate((np.array([[const], [const]]), true_components), axis=1)
-        true_feat = np.concatenate((np.array(['constant']), std_idx[std_mask]))
+        true_feat = np.concatenate((np.array(['intercept']), std_idx[std_mask]))
         test_comp, test_feat = es.decision_function_components(std_arr, output_interaction_names=True, mask=True)
         assert np.all(test_comp == true_components)
         assert np.all(test_feat == true_feat)
@@ -492,23 +492,28 @@ class TestExPSVM:
         true_lin_model = np.squeeze(std_lin_model)
         es = exp.ExPSVM(sv=std_arr, dual_coef=std_dual_coef,
                         kernel_d=std_d, kernel_r=std_r, kernel_gamma=std_gamma,
-                        p=std_p, intercept=None)
+                        p=std_p, intercept=0)
         es.transform_svm()
 
         # Test unsorted with all features
-        feat_imp, feat, _ = es.feature_importance(sort=False)
+        feat_imp, feat, _ = es.feature_importance(sort=False, include_intercept=False)
         assert np.all(feat_imp == true_lin_model)
         assert np.all(feat == std_idx)
 
+        # Test unsorted with all features and intercept
+        feat_imp, feat, _ = es.feature_importance(sort=False, include_intercept=True)
+        assert np.all(feat_imp == np.append([0], true_lin_model))
+        assert np.all(feat == np.append(['intercept'], std_idx))
+
         # Test sorted with all features
-        feat_imp, feat, _ = es.feature_importance()
+        feat_imp, feat, _ = es.feature_importance(include_intercept=False)
         sort_order = np.argsort(true_lin_model)[::-1]
         assert np.all(feat_imp == true_lin_model[sort_order])
         assert np.all(feat == std_idx[sort_order])
 
         # Test sorted with mask
         es.interaction_mask = std_mask
-        feat_imp, feat, _ = es.feature_importance(mask=True)
+        feat_imp, feat, _ = es.feature_importance(mask=True, include_intercept=False)
         sort_order = np.argsort(true_lin_model[std_mask])[::-1]
         assert np.all(feat_imp == true_lin_model[std_mask][sort_order])
         assert np.all(feat == std_idx[std_mask][sort_order])
@@ -523,7 +528,7 @@ class TestExPSVM:
         formatted_strs = es.format_interaction_names(std_idx)
         assert np.all(formatted_strs == np.array(['x_{0}', 'x_{1}', 'x_{2}', 'x_{0}^{2}', 'x_{0}x_{1}', 'x_{0}x_{2}',
                                                   'x_{1}^{2}', 'x_{1}x_{2}', 'x_{2}^{2}']))
-    #
+
     def test_feature_selection(self, std_p, std_d, std_r, std_arr, std_gamma,
                                std_dual_coef, std_lin_model):
         """
@@ -533,7 +538,7 @@ class TestExPSVM:
         true_lin_model = np.squeeze(std_lin_model)
         es = exp.ExPSVM(sv=std_arr, dual_coef=std_dual_coef,
                         kernel_d=std_d, kernel_r=std_r, kernel_gamma=std_gamma,
-                        p=std_p, intercept=None)
+                        p=std_p, intercept=0)
         es.transform_svm()
 
         sorted_lm = np.sort(true_lin_model)[::-1]
@@ -560,7 +565,7 @@ class TestExPSVM:
         """
         es = exp.ExPSVM(sv=std_arr, dual_coef=std_dual_coef,
                         kernel_d=std_d, kernel_r=std_r, kernel_gamma=std_gamma,
-                        p=std_p, intercept=None)
+                        p=std_p, intercept=0)
         es.transform_svm()
 
         # Test user-defined, boolean mask

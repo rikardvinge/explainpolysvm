@@ -34,6 +34,7 @@ import numpy as np
 import itertools as it
 from typing import List, Tuple
 from sklearn.svm import SVC
+import matplotlib.pyplot as plt
 
 
 class InteractionUtils:
@@ -246,6 +247,9 @@ class ExPSVM:
             is required. The transformation is done using transform_svm() without any input and may become
             computationally heavy if kernel dimension and the number of features are large. Default is False.
 
+        feature_names : List of strings
+            List of feature names in the original space.
+
         Attributes
         ----------
         _interactions : numpy.ndarray of str of shape (n_interactions,)
@@ -282,7 +286,9 @@ class ExPSVM:
     def __init__(self, sv: np.ndarray = None, dual_coef: np.ndarray = None,
                  intercept: float = None,
                  kernel_d: int = None, kernel_r: float = None, kernel_gamma: float = None,
-                 p: int = None, svc_model: SVC = None, transform: bool = False) -> None:
+                 p: int = None, svc_model: SVC = None, transform: bool = False,
+                 feature_names: List[str] = None
+                 ) -> None:
 
         if svc_model is not None:
             if svc_model.classes_.size != 2:
@@ -340,6 +346,12 @@ class ExPSVM:
         self.linear_model = np.array([])
         # Flag to ensure decision function uses masking if linear model has been masked.
         self.linear_model_is_masked: bool = False
+
+        # Feature names
+        if feature_names is not None:
+            self.feature_names: List[str] = feature_names
+        else:
+            self.feature_names: List[str] = None
 
         # Transform
         if transform:
@@ -412,6 +424,17 @@ class ExPSVM:
             return self.linear_model
         else:
             return self.linear_model[self.get_interaction_index(**kwargs), :]
+
+    def set_feature_names(self, feature_names: List[str]) -> None:
+        """
+        Set names for the features in original space
+        Parameters
+        ----------
+        feature_names : List of strings
+            List of feature names
+
+        """
+        self.feature_names = feature_names
 
     def _set_transform(self) -> None:
         """
@@ -569,8 +592,11 @@ class ExPSVM:
         if mask:
             self.linear_model_is_masked = True
 
-    def decision_function_components(self, x: np.ndarray, output_interaction_names: bool = False,
-                                     reduce_memory: bool = False, mask: bool = False):
+    def decision_function_components(self, x: np.ndarray,
+                                     include_intercept: bool = True,
+                                     output_interaction_names: bool = False,
+                                     reduce_memory: bool = False, mask: bool = False,
+                                     format_interaction_names: bool = False):
         """
         Returns the components of the decision function for the observation(s) x.
 
@@ -578,6 +604,9 @@ class ExPSVM:
         ----------
         x : Numpy ndarray of shape (n_observations, n_features)
             Observations to calculate decision function for.
+        include_intercept : Boolean
+            Set to True (default) to prepend the intercept to both the decision function component values and the
+            interaction names.
         output_interaction_names : Boolean
             If True, return also the names of the interactions.
         reduce_memory : Boolean
@@ -586,6 +615,8 @@ class ExPSVM:
         mask : Boolean
             Set to True to apply interaction_mask to the decision function, removing some interactions.
             Default is False.
+        format_interaction_names : Boolean
+            Set to True to format the interaction names using the feature names, if they exist. Default is False.
 
         Returns
         -------
@@ -606,10 +637,15 @@ class ExPSVM:
         # of the observations and the linear model.
         df_comp = np.multiply(x_trans, np.transpose(self.get_linear_model(mask=use_mask)))
         # Prepend the independent component, the SVM intercept.
-        df_comp = np.concatenate((self.intercept * np.ones((x.shape[0], 1)), df_comp), axis=1)
+        if include_intercept:
+            df_comp = np.concatenate((self.intercept * np.ones((x.shape[0], 1)), df_comp), axis=1)
         if output_interaction_names:
-            feat = np.concatenate((['constant'], self.get_interactions(mask=use_mask)), axis=0)
-            return df_comp, feat
+            feat_names = self.get_interactions(mask=use_mask)
+            if include_intercept:
+                feat_names = np.append(['intercept'], feat_names)
+            if format_interaction_names:
+                feat_names = self.format_interaction_names(feat_names)
+            return df_comp, feat_names
         else:
             return df_comp
 
@@ -637,7 +673,8 @@ class ExPSVM:
                                                      reduce_memory=reduce_memory, mask=mask)
         return np.sum(dot_prod, axis=1, keepdims=False)
 
-    def feature_importance(self, sort: bool = True, format_names: bool = False, magnitude=True, **kwargs):
+    def feature_importance(self, sort: bool = True, format_names: bool = False, magnitude: bool = True,
+                           include_intercept: bool = True, **kwargs):
         """
         Calculate feature importance and return feature importance, feature names and sorting order.
 
@@ -650,6 +687,8 @@ class ExPSVM:
         magnitude : Boolean
             If True (default) return the absolute value of the feature importance, otherwise return the signed
             importance.
+        include_intercept : Boolean
+            If True (default) append intercept to list of feature importance.
         kwargs : Arguments passed to get_linear_model.
 
         Returns
@@ -662,17 +701,32 @@ class ExPSVM:
             Sorting order to get feat_names from _interactions.
         """
 
-        feat_importance = np.squeeze(np.abs(self.get_linear_model(**kwargs)[:, 0]))
+        # Get interaction importance
         feat_importance_signed = np.squeeze(self.get_linear_model(**kwargs)[:, 0])
+
+        # Get feature names
+        feat_names = self.get_interactions(**kwargs)
+
+        # Append intercept
+        if include_intercept:
+            feat_importance_signed = np.append([self.intercept], feat_importance_signed)
+            feat_names = np.append(['intercept'], feat_names)
+
+        # Calculate magnitudes of interaction importance
+        feat_importance = np.abs(feat_importance_signed)
+
+        # Order feature importance and names
         if sort:
             sort_order = np.argsort(feat_importance)[::-1]
         else:
             sort_order = np.arange(feat_importance.size)
         feat_importance = feat_importance[sort_order]
         feat_importance_signed = feat_importance_signed[sort_order]
-        feat_names = self.get_interactions(**kwargs)[sort_order]
+        feat_names = feat_names[sort_order]
+
         if format_names:
-            feat_names = self. format_interaction_names(feat_names)
+            feat_names = self.format_interaction_names(feat_names)
+
         if magnitude:
             return feat_importance, feat_names, sort_order
         else:
@@ -702,7 +756,8 @@ class ExPSVM:
             Boolean array where True at elements that are judges as important by the input constraints.
         """
 
-        feat_imp, _, sort_order = self.feature_importance()
+        feat_imp, _, sort_order = self.feature_importance(include_intercept=False)
+
         if n_interactions is not None:
             if (n_interactions < 1) or (n_interactions > self._interactions.size):
                 raise ValueError("n_feat should be an integer in the range [0,{}]. Current value: {}"
@@ -772,13 +827,225 @@ class ExPSVM:
         formatted_strs : List[str]
             List of formatted interaction strings.
         """
-        interactions = [[int(ind) for ind in ind_str.split(',')] for ind_str in interaction_strs]
         formatted_strs = []
-        for interaction in interactions:
-            indices = np.arange(self.p)
-            counts = [np.count_nonzero(interaction == ind) for ind in indices]
-            counts_str = ''.join(
-                ['x_{{{}}}^{{{}}}'.format(i, c) if c > 1 else 'x_{{{}}}'.format(i) if c == 1 else ''
-                 for i, c in enumerate(counts)])
-            formatted_strs.append(counts_str)
+        if self.feature_names is None:
+            interactions = [[int(ind) if ind != 'intercept' else 'intercept'
+                             for ind in ind_str.split(',')] for ind_str in interaction_strs]
+            for interaction in interactions:
+                indices = np.arange(self.p)
+                counts = [np.count_nonzero(interaction == ind) for ind in indices]
+                counts_str = ''.join(
+                    ['$x_{{{}}}^{{{}}}$'.format(i, c) if c > 1 else '$x_{{{}}}$'.format(i) if c == 1 else ''
+                     for i, c in enumerate(counts)])
+
+                formatted_strs.append(counts_str)
+        else:
+            f_name_dict = {str(num): name for num, name in enumerate(self.feature_names)}
+            f_name_dict['intercept'] = 'intercept'  # Add constant to feature name dictionary
+            for ind, feat_name in enumerate(interaction_strs):
+                interaction_name = ')*('.join([f_name_dict[f] for f in feat_name.split(',')])
+                if '*' not in interaction_name:
+                    interaction_name = interaction_name.replace('(', '').replace(')', '')
+                else:
+                    interaction_name = '(' + interaction_name + ')'
+                formatted_strs.append(interaction_name)
         return formatted_strs
+
+
+class plot:
+    @staticmethod
+    def model_bar(es: ExPSVM, n_features: int = 10, magnitude: bool = False,
+                  include_intercept: bool = False, figsize: Tuple[int] = (12, 4)):
+        """
+
+        Parameters
+        ----------
+        es
+        n_features
+        magnitude
+        include_intercept
+        figsize
+
+        Returns
+        -------
+
+        """
+        feat_importance, feat_names, sort_order = es.feature_importance(format_names=True,
+                                                                        magnitude=magnitude,
+                                                                        include_intercept=include_intercept)
+
+        if len(feat_importance) < n_features:
+            n_features = len(feat_importance)
+
+        # Create bar plot
+        fig, ax = plt.subplots(1, 1, figsize=figsize)
+        ax.bar(x=np.arange(n_features), height=feat_importance[0:n_features],
+               tick_label=feat_names[0:n_features])
+        plt.xticks(rotation=90)
+        plt.xlabel('Interaction')
+        ylabel = 'Decision function weight'
+        title = f'Top {n_features} most important interactions'
+
+        if magnitude:
+            ylabel += ' magnitude'
+            title += ' (magnitude)'
+        plt.ylabel(ylabel)
+        plt.title(title)
+        plt.xlim([-1, n_features])
+        plt.draw()
+        return fig, ax
+
+    @staticmethod
+    def sample_waterfall(es: ExPSVM, x: np.ndarray, n_features: int = 10,
+                         figsize: Tuple[int] = (5, 4), xlim: List[float] = None,
+                         show_decision_value: bool = True,
+                         show_labels: bool = True,
+                         intercept_color: str = 'black', positive_color: str = 'tab:blue',
+                         negative_color: str = 'tab:red'):
+        """
+        Visualize interaction importance for a single observation using a waterfall graph.
+
+        Parameters
+        ----------
+        es : ExPSVM
+            ExPSVM instance to use for interaction importance visualization.
+        x : np.ndarray
+            Sample to visualize. Should have shape (n_original_features,).
+        n_features : int
+            Number of features to explicitly show. Any remaining features will be bunched together into a "Remaining"
+            bar. Default is 10. n_features is set to n_original_features if n_original_features < n_features.
+        figsize : Tuple of two integers
+            Size of the pyplot graph. Should be of the format [w, h] or (w, h) where w and h are integers.
+        xlim : List of two integers or None
+            Custom limits to x-axis. This is useful to prettify the plots in case show_labels=True. This is due to
+            the difficulties to get the extents of pyplot.text text boxes in a useful format. This input may be
+            removed in the future in case a way of ensuring that the labels are confined to the inside of the
+            drawing area is found.
+        show_decision_value : Boolean
+            Set to True (default) to print the decision value.
+        show_labels : Boolean
+            Set to True (default) to show the contributions of each interaction.
+        intercept_color : str
+            Matplotlib color to use for the intercept bar. Default is 'black'.
+        positive_color : str
+            Matplotlib color to use for the interactions with positive contribution. Default is 'tab:blue'.
+        negative_color : str
+            Matplotlib color to use for the interactions with negative contribution. Default is 'tab:red'.
+
+        Returns
+        -------
+        fig : pyplot figure
+        ax : pyplot axis
+        """
+
+        # Check validity of observation
+        x = np.squeeze(x)
+        if len(x.shape) > 1:
+            ValueError(
+                'Input observation x should have dimension (n_feature,). Shape of provided input {}'.format(x.shape))
+
+        # Calculate decision function value and components
+        desc_fun = es.decision_function(x)[0]
+        y_comp, feat_names = es.decision_function_components(x=x, include_intercept=False,
+                                                             output_interaction_names=True,
+                                                             format_interaction_names=True)
+        y_comp = y_comp[0]
+
+        # Reset number of features to show if value is too high.
+        if y_comp.size < n_features:
+            n_features = y_comp.size
+
+        # Get order of interactions in descending order of importance
+        sort_order = np.flip(np.argsort(np.abs(y_comp)))
+
+        # Reorder components and interaction names
+        y_comp_sort = y_comp[sort_order]
+        feat_names_sort = np.array(feat_names)[sort_order]
+
+        # Check if there are any interactions that are not shown
+        n_remaining = y_comp_sort.size - n_features
+
+        # Instantiate plot
+        fig, ax = plt.subplots(1, 1, figsize=figsize)
+        n_bars = n_features + 1
+        if n_remaining > 0:
+            n_bars += 1
+        ymin = -n_bars
+        ymax = 1
+
+        # Bar for intercept
+        bar = ax.barh(0, es.intercept, color=intercept_color, label='hej')
+        if show_labels:
+            add_sign = '+' if es.intercept > 0 else ''
+            ax.bar_label(bar, [add_sign + '{:.1e}'.format(es.intercept)], label_type='edge')
+
+        # Loop over interactions to show.
+        current_width = es.intercept
+        for ind in np.arange(n_features):
+            # Width and color of bar
+            feat_imp = y_comp_sort[ind]
+            col = positive_color if feat_imp > 0 else negative_color
+
+            # Plot bar
+            bar = ax.barh(-1 - ind, feat_imp, left=current_width, color=col, align='center')
+
+            # Plot vertical dashed line to previous
+            ax.vlines(x=current_width, ymin=-ind - 1.4, ymax=-ind + 0.4, linestyle='-', color='black')
+
+            # End point of previous bar
+            current_width += feat_imp
+            if show_labels:
+                # Add text
+                if feat_imp > 0:
+                    text_col = positive_color
+                    add_sign = '+'
+                else:
+                    text_col = negative_color
+                    add_sign = ''
+                ax.bar_label(bar, [add_sign + '{:.1e}'.format(feat_imp)], color=text_col, label_type='edge')
+
+        # Add bar for remaining features
+        if n_remaining > 0:
+            remaining_interaction_imp = y_comp_sort[n_features:].sum()
+            if remaining_interaction_imp > 0:
+                remaining_color = positive_color
+            else:
+                remaining_color = negative_color
+            bar = ax.barh(1 - n_bars, remaining_interaction_imp, left=current_width, color=remaining_color)
+
+            # Plot vertical dashed line to previous
+            ax.vlines(x=current_width, ymin=-n_bars + 0.6, ymax=-n_bars + 2.4, linestyle='-', color='black')
+            if show_labels:
+                if remaining_interaction_imp > 0:
+                    add_sign = '+'
+                else:
+                    add_sign = ''
+                ax.bar_label(bar, [add_sign + '{:.1e}'.format(remaining_interaction_imp)],
+                             color=remaining_color, label_type='edge')
+
+        # Plot decision function value
+        if show_decision_value:
+            # Extend plot slightly
+            ymin -= 1
+            # Draw vertical line to x-axis of the decision function value
+            ax.vlines(desc_fun, -n_bars, 1.4 - n_bars, color='k', linestyle='--', clip_on=False)
+
+            # Write decision function value
+            ax.text(desc_fun, -n_bars, 'f(x)={:.2e}'.format(desc_fun), ha='center', va='top')
+
+        # Add vertical bar at x=0
+        ax.vlines(0, ymin, 1, linestyle='--', color='k', zorder=-np.inf)
+
+        # Configure graph
+        yticks = np.concatenate((['intercept'], feat_names_sort[0:n_features]))
+        if n_remaining > 0:
+            yticks = np.concat((yticks, [f'Remaining {n_remaining} interactions']))
+        ax.set_yticks(ticks=-np.arange(n_bars), labels=yticks)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.set_xlabel('Decision function value')
+        ax.set_ylim([ymin, ymax])
+        if xlim is not None:
+            ax.set_xlim(xlim)
+        plt.draw()
+        return fig, ax
