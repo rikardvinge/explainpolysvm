@@ -35,6 +35,7 @@ import itertools as it
 from typing import List, Tuple
 from sklearn.svm import SVC
 import matplotlib.pyplot as plt
+from .plot import waterfall
 
 
 class InteractionUtils:
@@ -851,16 +852,12 @@ class ExPSVM:
                 formatted_strs.append(interaction_name)
         return formatted_strs
 
-
-class plot:
-    @staticmethod
-    def model_bar(es: ExPSVM, n_features: int = 10, magnitude: bool = False,
-                  include_intercept: bool = False, figsize: Tuple[int] = (12, 4)):
+    def plot_model_bar(self, n_features: int = 10, magnitude: bool = False,
+                       include_intercept: bool = False, figsize: Tuple[int] = (12, 4)):
         """
 
         Parameters
         ----------
-        es
         n_features
         magnitude
         include_intercept
@@ -870,9 +867,9 @@ class plot:
         -------
 
         """
-        feat_importance, feat_names, sort_order = es.feature_importance(format_names=True,
-                                                                        magnitude=magnitude,
-                                                                        include_intercept=include_intercept)
+        feat_importance, feat_names, sort_order = self.feature_importance(format_names=True,
+                                                                          magnitude=magnitude,
+                                                                          include_intercept=include_intercept)
 
         if len(feat_importance) < n_features:
             n_features = len(feat_importance)
@@ -895,47 +892,21 @@ class plot:
         plt.draw()
         return fig, ax
 
-    @staticmethod
-    def sample_waterfall(es: ExPSVM, x: np.ndarray, n_features: int = 10,
-                         figsize: Tuple[int] = (5, 4), xlim: List[float] = None,
-                         show_decision_value: bool = True,
-                         show_labels: bool = True,
-                         intercept_color: str = 'black', positive_color: str = 'tab:blue',
-                         negative_color: str = 'tab:red'):
+    def plot_sample_waterfall(self, x: np.ndarray, n_features: int = 10, **kwargs):
         """
         Visualize interaction importance for a single observation using a waterfall graph.
 
         Parameters
         ----------
-        es : ExPSVM
-            ExPSVM instance to use for interaction importance visualization.
         x : np.ndarray
             Sample to visualize. Should have shape (n_original_features,).
         n_features : int
             Number of features to explicitly show. Any remaining features will be bunched together into a "Remaining"
             bar. Default is 10. n_features is set to n_original_features if n_original_features < n_features.
-        figsize : Tuple of two integers
-            Size of the pyplot graph. Should be of the format [w, h] or (w, h) where w and h are integers.
-        xlim : List of two integers or None
-            Custom limits to x-axis. This is useful to prettify the plots in case show_labels=True. This is due to
-            the difficulties to get the extents of pyplot.text text boxes in a useful format. This input may be
-            removed in the future in case a way of ensuring that the labels are confined to the inside of the
-            drawing area is found.
-        show_decision_value : Boolean
-            Set to True (default) to print the decision value.
-        show_labels : Boolean
-            Set to True (default) to show the contributions of each interaction.
-        intercept_color : str
-            Matplotlib color to use for the intercept bar. Default is 'black'.
-        positive_color : str
-            Matplotlib color to use for the interactions with positive contribution. Default is 'tab:blue'.
-        negative_color : str
-            Matplotlib color to use for the interactions with negative contribution. Default is 'tab:red'.
 
         Returns
         -------
         fig : pyplot figure
-        ax : pyplot axis
         """
 
         # Check validity of observation
@@ -945,10 +916,9 @@ class plot:
                 'Input observation x should have dimension (n_feature,). Shape of provided input {}'.format(x.shape))
 
         # Calculate decision function value and components
-        desc_fun = es.decision_function(x)[0]
-        y_comp, feat_names = es.decision_function_components(x=x, include_intercept=False,
-                                                             output_interaction_names=True,
-                                                             format_interaction_names=True)
+        y_comp, feat_names = self.decision_function_components(x=x, include_intercept=False,
+                                                               output_interaction_names=True,
+                                                               format_interaction_names=True)
         y_comp = y_comp[0]
 
         # Reset number of features to show if value is too high.
@@ -960,92 +930,49 @@ class plot:
 
         # Reorder components and interaction names
         y_comp_sort = y_comp[sort_order]
-        feat_names_sort = np.array(feat_names)[sort_order]
+        feat_names_sort = list(np.array(feat_names)[sort_order])
+
+        # Instantiate array of bar widths and labels
+        bar_widths = np.concatenate(([self.intercept], y_comp_sort[0:n_features]))
+        labels = ['Intercept'] + feat_names_sort[0:n_features]
+        # labels = np.concatenate((['intercept'], feat_names_sort[0:n_features]))
 
         # Check if there are any interactions that are not shown
         n_remaining = y_comp_sort.size - n_features
-
-        # Instantiate plot
-        fig, ax = plt.subplots(1, 1, figsize=figsize)
-        n_bars = n_features + 1
         if n_remaining > 0:
-            n_bars += 1
-        ymin = -n_bars
-        ymax = 1
+            bar_widths = np.append(bar_widths, y_comp_sort[n_features:].sum())
+            labels.append(f'Remaining {n_remaining} interactions')
 
-        # Bar for intercept
-        bar = ax.barh(0, es.intercept, color=intercept_color, label='hej')
-        if show_labels:
-            add_sign = '+' if es.intercept > 0 else ''
-            ax.bar_label(bar, [add_sign + '{:.1e}'.format(es.intercept)], label_type='edge')
+        return waterfall(bar_widths, labels, **kwargs)
 
-        # Loop over interactions to show.
-        current_width = es.intercept
-        for ind in np.arange(n_features):
-            # Width and color of bar
-            feat_imp = y_comp_sort[ind]
-            col = positive_color if feat_imp > 0 else negative_color
+    def plot_sample_waterfall_degree(self, x: np.ndarray, n_degree: int = None, **kwargs):
+        # Check validity of observation
+        x = np.squeeze(x)
+        if len(x.shape) > 1:
+            ValueError(
+                'Input observation x should have dimension (n_feature,). Shape of provided input {}'.format(x.shape))
 
-            # Plot bar
-            bar = ax.barh(-1 - ind, feat_imp, left=current_width, color=col, align='center')
+        if (n_degree is None) | (n_degree > self.kernel_d):
+            n_degree = self.kernel_d
 
-            # Plot vertical dashed line to previous
-            ax.vlines(x=current_width, ymin=-ind - 1.4, ymax=-ind + 0.4, linestyle='-', color='black')
+        # Calculate decision function value and components
+        y_comp, feat_names = self.decision_function_components(x=x, include_intercept=False,
+                                                               output_interaction_names=True,
+                                                               format_interaction_names=True)
 
-            # End point of previous bar
-            current_width += feat_imp
-            if show_labels:
-                # Add text
-                if feat_imp > 0:
-                    text_col = positive_color
-                    add_sign = '+'
-                else:
-                    text_col = negative_color
-                    add_sign = ''
-                ax.bar_label(bar, [add_sign + '{:.1e}'.format(feat_imp)], color=text_col, label_type='edge')
+        bar_widths = np.array([self.intercept] + [y_comp[0, self._interaction_dims == d].sum()
+                                                  for d in np.arange(1, n_degree+1)])
+        labels = ['Intercept'] + [f'Degree {i}' for i in np.arange(1, n_degree+1)]
 
-        # Add bar for remaining features
+        # Check if there are any interactions that are not shown
+        n_remaining = self.kernel_d - n_degree
         if n_remaining > 0:
-            remaining_interaction_imp = y_comp_sort[n_features:].sum()
-            if remaining_interaction_imp > 0:
-                remaining_color = positive_color
-            else:
-                remaining_color = negative_color
-            bar = ax.barh(1 - n_bars, remaining_interaction_imp, left=current_width, color=remaining_color)
+            bar_widths = np.append(bar_widths, y_comp[0, self._interaction_dims > n_degree].sum())
+            # labels = np.append(labels, f'Remaining {n_remaining} interactions')
+            labels.append(f'Remaining {n_remaining} degrees')
 
-            # Plot vertical dashed line to previous
-            ax.vlines(x=current_width, ymin=-n_bars + 0.6, ymax=-n_bars + 2.4, linestyle='-', color='black')
-            if show_labels:
-                if remaining_interaction_imp > 0:
-                    add_sign = '+'
-                else:
-                    add_sign = ''
-                ax.bar_label(bar, [add_sign + '{:.1e}'.format(remaining_interaction_imp)],
-                             color=remaining_color, label_type='edge')
+        return waterfall(bar_widths, labels, **kwargs)
 
-        # Plot decision function value
-        if show_decision_value:
-            # Extend plot slightly
-            ymin -= 1
-            # Draw vertical line to x-axis of the decision function value
-            ax.vlines(desc_fun, -n_bars, 1.4 - n_bars, color='k', linestyle='--', clip_on=False)
 
-            # Write decision function value
-            ax.text(desc_fun, -n_bars, 'f(x)={:.2e}'.format(desc_fun), ha='center', va='top')
 
-        # Add vertical bar at x=0
-        ax.vlines(0, ymin, 1, linestyle='--', color='k', zorder=-np.inf)
 
-        # Configure graph
-        yticks = np.concatenate((['intercept'], feat_names_sort[0:n_features]))
-        if n_remaining > 0:
-            yticks = np.concat((yticks, [f'Remaining {n_remaining} interactions']))
-        ax.set_yticks(ticks=-np.arange(n_bars), labels=yticks)
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.set_xlabel('Decision function value')
-        ax.set_ylim([ymin, ymax])
-        if xlim is not None:
-            ax.set_xlim(xlim)
-        plt.draw()
-        return fig, ax
