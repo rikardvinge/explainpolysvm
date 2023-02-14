@@ -13,7 +13,7 @@ setup(
     packages=find_packages(),
     install_requires=['numpy>=1.21.5', 'scikit-learn>=1.0.2', 'matplotlib'],
     extras_require={'dev': ['pytest>=6.2.5']},
-    keywords=['feature importance', 'support vector machine', 'svm', 'feature selection', 'polynomial kernel'],
+    keywords=['feature importance', 'support vector machine', 'svm', 'feature selection', 'feature importance', 'polynomial kernel'],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Programming Language :: Python :: 3',
