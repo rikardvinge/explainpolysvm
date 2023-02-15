@@ -34,8 +34,7 @@ import numpy as np
 import itertools as it
 from typing import List, Tuple
 from sklearn.svm import SVC
-import matplotlib.pyplot as plt
-from .plot import waterfall
+from .plot import waterfall, bar
 
 
 class InteractionUtils:
@@ -853,44 +852,50 @@ class ExPSVM:
         return formatted_strs
 
     def plot_model_bar(self, n_features: int = 10, magnitude: bool = False,
-                       include_intercept: bool = False, figsize: Tuple[int] = (12, 4)):
+                       include_intercept: bool = False, **kwargs):
         """
+        Visualize the weights of the interactions in the decision function of 
+        an SVM trained with polynomial kernel using a bar chart. Interactions
+        are ordered from the highest weight to the lowest.
 
         Parameters
         ----------
-        n_features
-        magnitude
-        include_intercept
-        figsize
+        n_features : Int
+            Number of features to show. Remaining features will be ignored
+        magnitude : Boolean
+            Set to True to visualize the magnitude of the importance. If False
+            the weight will be shown with it's corresponding sign. Default is False.
+        include_intercept : Boolean
+            Set to True to include the intercept among the weights. Default is False.
+        figsize : Tuple of two integers
+            Size of the pyplot graph. Should be of the format [w, h] or (w, h) where w and h are integers. 
+        kwargs : Comma-separated list key-value pairs
+            Arguments to forward to plot._bar.bar.
 
         Returns
         -------
-
+        matplotlib.figure.Figure or None
         """
-        feat_importance, feat_names, sort_order = self.feature_importance(format_names=True,
+        feat_importance, feat_names, _ = self.feature_importance(format_names=True,
                                                                           magnitude=magnitude,
                                                                           include_intercept=include_intercept)
 
+        # If number of features to plot is too large, set it to number of existing features.
         if len(feat_importance) < n_features:
             n_features = len(feat_importance)
 
-        # Create bar plot
-        fig, ax = plt.subplots(1, 1, figsize=figsize)
-        ax.bar(x=np.arange(n_features), height=feat_importance[0:n_features],
-               tick_label=feat_names[0:n_features])
-        plt.xticks(rotation=90)
-        plt.xlabel('Interaction')
+        # Get bar heights and labels
+        bar_heights = feat_importance[0:n_features]
+        labels = feat_names[0:n_features]
+
+        xlabel = 'Interaction'
         ylabel = 'Decision function weight'
         title = f'Top {n_features} most important interactions'
 
         if magnitude:
             ylabel += ' magnitude'
             title += ' (magnitude)'
-        plt.ylabel(ylabel)
-        plt.title(title)
-        plt.xlim([-1, n_features])
-        plt.draw()
-        return fig, ax
+        return bar(bar_heights, labels, xlabel=xlabel, ylabel=ylabel, title=title, **kwargs)
 
     def plot_sample_waterfall(self, x: np.ndarray, n_features: int = 10, **kwargs):
         """
@@ -903,10 +908,12 @@ class ExPSVM:
         n_features : int
             Number of features to explicitly show. Any remaining features will be bunched together into a "Remaining"
             bar. Default is 10. n_features is set to n_original_features if n_original_features < n_features.
+        kwargs : Comma-separated list key-value pairs
+            Arguments to forward to plot._waterfall.waterfall
 
         Returns
         -------
-        fig : pyplot figure
+        matplotlib.figure.Figure or None
         """
 
         # Check validity of observation

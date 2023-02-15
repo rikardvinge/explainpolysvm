@@ -6,6 +6,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 from sklearn.model_selection import train_test_split
 from typing import Tuple
+import matplotlib
 
 # Create random number generator for repeatable tests.
 rng = np.random.default_rng(101)
@@ -741,3 +742,42 @@ class TestExPSVM:
         expsvm_df = es.decision_function(X_test)
         tol = 1e-10
         assert np.all(np.abs(expsvm_df - sklearn_df) < tol)
+
+    def test_plot_model_bar(self, std_arr, std_dual_coef, std_d, std_gamma,
+                      std_r, std_p):
+        """
+        Verify that plot_model_bar outputs a matplotlib figure.
+        """
+        es = exp.ExPSVM(sv=std_arr, dual_coef=std_dual_coef,
+                        kernel_d=std_d, kernel_r=std_r, kernel_gamma=std_gamma,
+                        p=std_p, intercept=1)
+        es.transform_svm()
+
+        fig = es.plot_model_bar(n_features=2, show=False)
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+    def test_plot_sample_waterfall(self, std_arr, std_dual_coef, std_d, std_gamma,
+                      std_r, std_p):
+        """
+        Verify that plot_sample_waterfall outputs a matplotlib figure.
+        """
+        es = exp.ExPSVM(sv=std_arr, dual_coef=std_dual_coef,
+                        kernel_d=std_d, kernel_r=std_r, kernel_gamma=std_gamma,
+                        p=std_p, intercept=1)
+        es.transform_svm()
+
+        fig = es.plot_sample_waterfall(x=std_arr, n_features=2, show=False)
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+    def test_plot_sample_waterfall_degree(self, std_arr, std_dual_coef, std_d, std_gamma,
+                      std_r, std_p):
+        """
+        Verify that plot_sample_waterfall_degree outputs a matplotlib figure.
+        """
+        es = exp.ExPSVM(sv=std_arr, dual_coef=std_dual_coef,
+                        kernel_d=std_d, kernel_r=std_r, kernel_gamma=std_gamma,
+                        p=std_p, intercept=1)
+        es.transform_svm()
+
+        fig = es.plot_sample_waterfall_degree(x=std_arr, n_degree=2, show=False)
+        assert isinstance(fig, matplotlib.figure.Figure)

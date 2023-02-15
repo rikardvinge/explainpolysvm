@@ -1,7 +1,6 @@
 import warnings
 try:
     import matplotlib.pyplot as plt
-    import matplotlib
 except ImportError:
     warnings.warn("matplotlib is not installed.")
     pass
@@ -14,7 +13,7 @@ def waterfall(bar_widths: np.ndarray, labels: List[str], show: bool = True,
               figsize: Tuple[int] = (5, 4), xlim: List[float] = None,
               positive_color: 'str' = 'tab:red', negative_color: 'str' = 'tab:blue'):
     """
-    Visualize interaction importance for a single observation using a waterfall graph.
+    Create a waterfall chart.
 
     Parameters
     ----------
@@ -43,8 +42,7 @@ def waterfall(bar_widths: np.ndarray, labels: List[str], show: bool = True,
 
     Returns
     -------
-    fig : pyplot figure
-    ax : pyplot axis
+    matplotlib.figure.Figure or None
     """
     # Instantiate plot
     fig, ax = plt.subplots(1, 1, figsize=figsize)
