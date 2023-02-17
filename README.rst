@@ -73,9 +73,10 @@ details about which interaction the feature correspond to. :code:`sort_order` pr
 to reorder the interactions returned by es.get_interactions() to the same order as returned by es.feature_importance().
 Feature names are returned as strings of the form :code:`i,j,k,l,...`, where :code:`i`, :code:`j`, :code:`k`, :code:`l`
 are integers in the range :math:`[1,p]` where `p` is the number of features in the original space. For example, the
-interaction '0,1,0,2,2' correspond to the interaction :math:`x0^2*x1*x2^2`.
+interaction '0,1,0,2,2' correspond to the interaction :math:`x_0^2*x_1*x_2^2`.
 Alternatively, setting the flag :code:`format_names=True` returns the feature names as formatted strings that are suitable for plotting. For
-example, the interaction '0,1,0,2,2' is returned as 'x_{0}^{2}x_{1}x_{2}^{2}'.
+example, the interaction '0,1,0,2,2' is returned as '$x_{0}^{2}$$x_{1}$$x_{2}^{2}$', or as a list of feature names if the
+:code:`feature_names` argument is passed to the ExPSVM constructor.
 
 To return formatted feature names, use
 
@@ -109,7 +110,9 @@ Under the hood, ExPSVM calculates a compressed version of the full polynomial tr
 Without compression, the number of interactions in this transformation is of order :math:`O(p^d)`, where :math:`p` is
 the number of features in the original space, and :math:`d` the polynomial degree of the kernel.
 The compression reduces the number of interactions by keeping only one copy of each unique interaction, with a
-compression ratio of :math:`d!:1`. Even so, it is not recommended to use too large :math:`p` or :math:`d`.
+compression ratio of :math:`d!:1`. Even so, it is not recommended to use too large :math:`p` or :math:`d`,
+both because of potential memory issues but also due to the decreasing explainability in models with very large
+kernel spaces.
 
 Example usage
 =============
@@ -131,12 +134,12 @@ Below the dataset is shown
 The training set constitutes 200 samples from each of the two classes while the testset contains 300 from each class.
 
 An SVM with a polynomial kernel is trained using Scikit-learn with parameters 
-:math:`C=0.9`, :math:`d=3`, :math:`gamma=scale`, , :math:`r=sqrt(2)`. With 3 features and a third-order polynomial
+:math:`C=0.9`, :math:`d=3`, :math:`gamma=scale`, :math:`r=sqrt(2)`. With 3 features and a third-order polynomial
 kernel, the number of interactions is 19, not counting the intercept.
 
 The test performance on the 600-sample, balanced, test set is around 0.92.
 
-The trained the SVM and extract interaction importance the following code can be used
+To train the SVM and extract interaction importance the following code can be used
 
 .. code-block::
 
@@ -175,7 +178,7 @@ This produce the graph below.
 
 .. image:: ./examples/3d_tubes/images/feature_importance_3d.png
     :width: 8cm
-    :height: 4cm
+    :height: 5cm
 
 The resulting weight for the coefficient in the decision function is greatly dominated by the sqaure of the two first features,
 as we expect given the generating distributions of the data.
@@ -190,7 +193,7 @@ Looking at a single observation, we can create such a graph using
 
 
 In the example run the observation is of class -1 and has features [0.356, -1.352, 0.592]. With a radial
-distance to the :math:`x2`-axis of 1.398 it is well within the class -1 region.
+distance to the :math:`x_2`-axis of 1.398 it is well within the class -1 region.
 The decision score for this observation is -4.6, correctly classifying it as belonging to class -1.
 The contributions to the decision of this observation is presented in the figure below.
 
@@ -198,8 +201,8 @@ The contributions to the decision of this observation is presented in the figure
     :width: 5cm
     :height: 6cm
 
-The absolute strongest contribution is from :math:`x1^2`, a reasonable result given the strong weight on the
-interaction :math:`x1^2` as well on this observation's relatively large value in this feature.
+The absolute strongest contribution is from :math:`x_1^2`, a reasonable result given the strong weight on the
+interaction :math:`x_1^2` as well on this observation's relatively large value in this feature.
 
 We may also be interested in the importance of the degree of the interactions. To produce a waterfall chart the sums up
 all contributions from each degree of interaction we can use
@@ -227,7 +230,7 @@ The results are presented as a boxplot of 100 test sets, each containing 500 obs
 of interactions is reduced in order of least importance. We find a small by gradual increase in median
 classification accuracy, as well as a slight reduction in the standard deviation of the accuracy from 8.3e-3 to 7.1e-3. We also find that when dropping
 the 18th feature, i.e. the second most important, performance drops to slightly above chance. This is due to dropping
-of the two most important interactions, :math:`x1^2`.
+of the two most important interactions, :math:`x_1^2`.
 
 .. image:: ./examples/3d_tubes/images/feature_selection_3d.png
     :width: 8cm
