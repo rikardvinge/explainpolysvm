@@ -47,8 +47,7 @@ def bar(bar_heights: np.ndarray, labels: List[str], show: bool = True, figsize: 
         ax.set_ylabel(ylabel)
     if title is not None:
         ax.set_title(title)
-    print()
-    print(show)
+        
     if show:
         plt.show()
     else:
