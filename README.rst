@@ -240,12 +240,7 @@ of the two most important interactions, :math:`x_1^2`.
 Further reading
 ===============
 
-A manuscript with the details has been submitted for review. In the meantime, for more detailed information
-about the underlying theory of ExPSVM, please refer to |location_link|.
-
-.. |location_link| raw:: html
-
-   <a href="https://github.com/rikardvinge/explainpolysvm/blob/main/Polynomial_SVM_feature_importance_and_selection.pdf" target="_blank">Polynomial_SVM_feature_importance_and_selection.pdf</a>
+A manuscript with the details has been submitted for review.
 
 A note on package maintenance
 =============================
