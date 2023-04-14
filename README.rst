@@ -269,5 +269,4 @@ Citations
 If you use ExplainPolySVM in your work we would appreciate a citation. A manuscript, authored together with J. Lundström
 and S. Byttner at Högskolan i Halmstad, has been submitted for review but in the meantime please ucite according to the
 CITATION.cff, or
-
-R. Vinge (2023) ExplainPolySVM (Version 0.4) https://github.com/rikardvinge/explainpolysvm
+    R. Vinge (2023) ExplainPolySVM (Version 0.4) https://github.com/rikardvinge/explainpolysvm
