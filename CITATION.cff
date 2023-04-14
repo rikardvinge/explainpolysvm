@@ -5,6 +5,6 @@ authors:
     given-names: Rikard
     orcid: https://orcid.org/0000-0002-7306-3403
 title: "ExplainPolySVM"
-version: 0.3.1
-doi: ADD THROUGH ZENODO WHEN PUBLISHING REPO https://github.com/CABAH/assignDOI
-date-released: 2022-05-06
+version: 0.4
+date-released: 2023-04-14
+url: https://github.com/rikardvinge/explainpolysvm

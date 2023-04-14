@@ -240,7 +240,8 @@ of the two most important interactions, :math:`x_1^2`.
 Further reading
 ===============
 
-For detailed information about the underlying theory of ExPSVM, please refer to |location_link|.
+A manuscript with the details has been submitted for review. In the meantime, for more detailed information
+about the underlying theory of ExPSVM, please refer to |location_link|.
 
 .. |location_link| raw:: html
 
@@ -250,7 +251,7 @@ A note on package maintenance
 =============================
 
 So far, ExplainPolySVM is developed as a hobby project by a single person. No promises will be made on maintenance nor expansions of this package.
-Feel free to fork, PR, and please let me know if you are interested in continuing it's development!
+Please let me know if you are interested in continuing its development and feel free to fork or PR!
 
 Future development
 ==================
@@ -262,4 +263,11 @@ Below is a non-exhaustive list of useful and interesting features to add to the 
 - Add support for the RBF Kernel by truncating the corresponding power series.
 - Investigate if least-square SVM, support vector regression, one-class SVM, etc. can be expressed in similar terms as done in this project for the standard SVM.
 
+Citations
+=========
 
+If you use ExplainPolySVM in your work we would appreciate a citation. A manuscript, authored together with J. Lundström
+and S. Byttner at Högskolan i Halmstad, has been submitted for review but in the meantime please ucite according to the
+CITATION.cff, or
+
+R. Vinge (2023) ExplainPolySVM (Version 0.4) https://github.com/rikardvinge/explainpolysvm
