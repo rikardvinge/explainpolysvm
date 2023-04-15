@@ -245,7 +245,7 @@ A manuscript with the details has been submitted for review.
 A note on package maintenance
 =============================
 
-So far, ExplainPolySVM is developed as a hobby project by a single person. No promises will be made on maintenance nor expansions of this package.
+So far, ExplainPolySVM is developed by a single person. No promises will be made on maintenance nor expansions of this package.
 Please let me know if you are interested in continuing its development and feel free to fork or PR!
 
 Future development
@@ -264,3 +264,8 @@ Citations
 If you use ExplainPolySVM in your work we would appreciate a citation. A manuscript, authored together with J. Lundström
 and S. Byttner at Högskolan i Halmstad, has been submitted for review. In the meantime please cite according to the
 CITATION.cff.
+
+Acknowledgments
+================
+
+This work has been supported by Volvo Group.
