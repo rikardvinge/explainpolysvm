@@ -262,7 +262,7 @@ Citations
 =========
 
 If you use ExplainPolySVM in your work we would appreciate a citation. A manuscript, authored together with J. Lundström
-and S. Byttner at Högskolan i Halmstad, has been submitted for review. In the meantime please cite according to the
+and S. Byttner at Halmstad University, has been submitted for review. In the meantime please cite according to the
 CITATION.cff.
 
 Acknowledgments
