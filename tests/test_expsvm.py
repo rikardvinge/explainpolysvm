@@ -8,6 +8,10 @@ from sklearn.model_selection import train_test_split
 from typing import Tuple
 import matplotlib
 
+# Fix so pytest assert with numpy datatypes work.
+import math
+np.math = math
+
 # Create random number generator for repeatable tests.
 rng = np.random.default_rng(101)
 
@@ -117,7 +121,6 @@ def polynomial_kernel(x: np.ndarray, y: np.ndarray, r: float, d: int, gamma: flo
     if len(y.shape) > 2:
         raise ValueError("y should be 2-dimensional. Shape of y is {}".format(y.shape))
     return (r + gamma * np.matmul(x, np.transpose(y))) ** d
-    # return (r + gamma * np.sum(np.multiply(x, y), axis=1, keepdims=False)) ** d
 
 
 def create_sklearn_expsvm_models(X_train, y_train, C, degree, gamma, r) -> Tuple[SVC, exp.ExPSVM]:
