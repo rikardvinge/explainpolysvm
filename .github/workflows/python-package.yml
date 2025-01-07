@@ -15,7 +15,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11","3.12", "3.13"]
+        python-version: ["3.8"]
+        #, "3.9", "3.10", "3.11","3.12", "3.13"]
 
     steps:
     - uses: actions/checkout@v4
@@ -79,12 +80,12 @@ jobs:
       #
       # ALTERNATIVE: if your GitHub Release name is the PyPI project version string
       # ALTERNATIVE: exactly, uncomment the following line instead:
-      url: https://pypi.org/project/YOURPROJECT/${{ github.event.release.name }}
+      url: https://pypi.org/project/ExplainPolySVM/${{ github.event.release.name }}
 
     steps:
       - name: Set up environment
         run: |
-          pyton -m pip install twine
+          python -m pip install twine
 
       - name: Retrieve release distributions
         uses: actions/download-artifact@v4
