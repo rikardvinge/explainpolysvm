@@ -1,0 +1,32 @@
+[project]
+name = "explainpolysvm"
+version = "0.4"
+description = "Module for Global and Local explanations and feature selection for Support Vector Machines trained with polynomial kernels."
+requires-python = ">=3.8"
+authors = [
+    {name = "Rikard Vinge", email = "research@rikardvinge.se"},
+]
+dependencies = [
+    "numpy>=1.21.5",
+    "scikit-learn>=1.0.2",
+    "matplotlib"
+]
+license = {file = "LICENSE"}
+keywords=["feature importance", "support vector machine", "svm", "feature selection", "polynomial kernel", "xai"]
+classifiers=[
+        "Development Status :: 4 - Beta",
+        "Programming Language :: Python :: 3",
+        "Intended Audience :: Developers",
+        "Intended Audience :: Education",
+        "Intended Audience :: Science/Research",
+        "Topic :: Scientific/Engineering :: Artificial Intelligence",
+        ]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.2.5"
+]
+
+[project.urls]
+Repository = "https://github.com/rikardvinge/explainpolysvm.git"
+Issues = "https://github.com/rikardvinge/explainpolysvm/issues"
