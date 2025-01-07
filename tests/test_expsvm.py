@@ -8,9 +8,10 @@ from sklearn.model_selection import train_test_split
 from typing import Tuple
 import matplotlib
 
-# Fix so pytest assert with numpy datatypes work.
-import math
-np.math = math
+# Fix so pytest assert with numpy datatypes work with numpy >= 2.
+if np.__version__ >= "2.0.0":
+    import math
+    np.math = math
 
 # Create random number generator for repeatable tests.
 rng = np.random.default_rng(101)
