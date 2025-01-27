@@ -41,3 +41,6 @@ dev = [
 [project.urls]
 Repository = "https://github.com/rikardvinge/explainpolysvm.git"
 Issues = "https://github.com/rikardvinge/explainpolysvm/issues"
+
+[tool.setuptools]
+license-files = []
