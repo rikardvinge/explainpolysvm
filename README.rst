@@ -228,7 +228,7 @@ If you use ExplainPolySVM in your work we would appreciate a citation. Please se
 
 .. code-block::
 
-    @InProceedings{vinge2025ExpSVM,
+    @InProceedings{vinge2025ExPSVM,
     author="Vinge, Rikard
     and Byttner, Stefan
     and Lundstr{\"o}m, Jens",
