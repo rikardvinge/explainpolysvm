@@ -177,7 +177,6 @@ The following code can be used to compute and visualize the interaction importan
     # Plot
     es.plot_model_bar(n_features=15, magnitude=False, figsize=(8,3))
 
-
 Local explanations
 ------------------
 
