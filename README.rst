@@ -15,11 +15,12 @@ To express feature importance, the trained SVM model is transformed into a compr
 Where to get
 ============
 
-The source code is currently hosted on GitHub at: https://github.com/rikardvinge/explainpolysvm
+The source code is currently hosted on pip and on GitHub at: https://github.com/rikardvinge/explainpolysvm
 
 Install with pip using
 
 .. code-block::
+
     pip install explainpolysvm
 
 To install from source, use the command
@@ -138,6 +139,7 @@ An SVM with a cubic kernel and parameters :math:`C=1, :math:`d=3`, :math:`gamma=
 sampled from the formula above, achieving an accuracy of 95.7% on a held-out test set.
 
 The global explanations are given by ExplainPolySVM are shown below
+
 .. image:: ./media/feature_importance_signed_artificial_strong_1dpd.png
     :width: 8cm
     :height: 8cm
@@ -185,6 +187,7 @@ example is based on `interaction_importance_wbc.ipynb <https://github.com/rikard
 In the example, a 2D SVM is trained on the Wisonsin Breast Cancer Dataset, achieving 97.3% accuracy.
 
 By standardizing the features to zero mean and unit variance, we can calculate the global explanations after training, as shown below.
+
 .. image:: ./media/feature_importance_signed_wbcd.png
     :width: 8cm
     :height: 8cm
@@ -196,9 +199,9 @@ Since the trained quadratic kernel SVM is mainly linear, the impact of the indiv
 can be compared with SHAP. This is shown below for an example from the negative class, with the decision function output -1.44, using the function :code:`es.plot_sample_waterfall()`
 
 .. image:: ./media/feature_importance_single_negative_wbcd.png
-    :width: 49 %
+    :width: 48 %
 .. image:: ./media/local_shap_same_format_wbcd.png
-    :width: 49 %
+    :width: 48 %
 
 The two local explanations for this sample are similar both in sign and magnitude. The reason for the different
 number of remaining features is that SHAP calculates the impact of the input features, including interactions with the feature,
