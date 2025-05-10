@@ -17,7 +17,7 @@ dependencies = [
     "matplotlib"
 ]
 license = {file = "LICENSE"}
-keywords=["feature importance", "support vector machine", "svm", "feature selection", "polynomial kernel", "xai"]
+keywords=["feature importance", "support vector machine", "svm", "feature selection", "polynomial kernel", "xai", "interaction importance"]
 classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Intended Audience :: Developers",
