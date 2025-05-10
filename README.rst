@@ -140,7 +140,7 @@ sampled from the formula above, achieving an accuracy of 95.7% on a held-out tes
 
 The global explanations are given by ExplainPolySVM are shown below
 
-.. image:: ./media/feature_importance_signed_artificial_strong_1dpd.png
+.. image:: https://github.com/rikardvinge/explainpolysvm/blob/main/media/feature_importance_signed_artificial_strong_1dpd.png
     :width: 80%
 
 The following code can be used to compute and visualize the interaction importance
@@ -187,7 +187,7 @@ In the example, a 2D SVM is trained on the Wisonsin Breast Cancer Dataset, achie
 
 By standardizing the features to zero mean and unit variance, we can calculate the global explanations after training, as shown below.
 
-.. image:: ./media/feature_importance_signed_wbcd.png
+.. image:: https://github.com/rikardvinge/explainpolysvm/blob/main/media/feature_importance_signed_wbcd.png
     :width: 80%
 
 Even though a 2D model was trained, all but one of the 30 input features are the most important in the model, while 
@@ -196,9 +196,9 @@ the quadratic interactions are less impactful. This indicates that a linear mode
 Since the trained quadratic kernel SVM is mainly linear, the impact of the individual input features
 can be compared with SHAP. This is shown below for an example from the negative class, with the decision function output -1.44, using the function :code:`es.plot_sample_waterfall()`
 
-.. image:: ./media/feature_importance_single_negative_wbcd.png
+.. image:: https://github.com/rikardvinge/explainpolysvm/blob/main/media/feature_importance_single_negative_wbcd.png
     :width: 49 %
-.. image:: ./media/local_shap_same_format_wbcd.png
+.. image:: https://github.com/rikardvinge/explainpolysvm/blob/main/media/local_shap_same_format_wbcd.png
     :width: 49 %
 
 The two local explanations for this sample are similar both in sign and magnitude. The reason for the different
