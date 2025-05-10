@@ -141,8 +141,7 @@ sampled from the formula above, achieving an accuracy of 95.7% on a held-out tes
 The global explanations are given by ExplainPolySVM are shown below
 
 .. image:: ./media/feature_importance_signed_artificial_strong_1dpd.png
-    :width: 8cm
-    :height: 8cm
+    :width: 80%
 
 The following code can be used to compute and visualize the interaction importance
 .. code-block::
@@ -189,8 +188,7 @@ In the example, a 2D SVM is trained on the Wisonsin Breast Cancer Dataset, achie
 By standardizing the features to zero mean and unit variance, we can calculate the global explanations after training, as shown below.
 
 .. image:: ./media/feature_importance_signed_wbcd.png
-    :width: 8cm
-    :height: 8cm
+    :width: 80%
 
 Even though a 2D model was trained, all but one of the 30 input features are the most important in the model, while 
 the quadratic interactions are less impactful. This indicates that a linear model could suffice.
