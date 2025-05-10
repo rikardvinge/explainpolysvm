@@ -227,7 +227,7 @@ Citations
 If you use ExplainPolySVM in your work we would appreciate a citation. Please see the CITATION.cff for citation, or use the following BibText
 .. code-block::
 
-    @InProceedings{10.1007/978-3-031-91398-3_34,
+    @InProceedings{vinge2025ExpSVM,
     author="Vinge, Rikard
     and Byttner, Stefan
     and Lundstr{\"o}m, Jens",
