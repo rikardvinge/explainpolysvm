@@ -5,6 +5,33 @@ authors:
     given-names: Rikard
     orcid: https://orcid.org/0000-0002-7306-3403
 title: "ExplainPolySVM"
-version: 0.4
-date-released: 2023-04-14
+version: 1.0
+date-released: 2025-05-10
 url: https://github.com/rikardvinge/explainpolysvm
+preferred-citation:
+  type: conference-paper
+  authors:
+    - family-names: Vinge
+      given-names: Rikard
+      orcid: https://orcid.org/0000-0002-7306-3403
+    - family-names: Byttner
+      given-names: Stefan
+      orcid: https://orcid.org/0000-0002-0293-040X
+    - family-names: Lundström
+      given-names: Jens
+      orcid: https://orcid.org/0000-0001-8804-5884
+  title: "Expanding Polynomial Kernels for Global and Local Explanations of Support Vector Machines"
+  pages: "456--468"
+  year: "2025"
+  isbn: "978-3-031-91398-3"
+  collection-title: "Advances in Intelligent Data Analysis XXIII"
+  doi: "10.1007/978-3-031-91398-3_34"
+  publisher: 
+    name: "Springer Nature Switzerland"
+  editors:
+    - family-names: Krempl
+      given-names: Georg
+    - family-names: Puolamäki
+      given-names: Kai
+    - family-names: Miliou
+      given-names: Ioanna
