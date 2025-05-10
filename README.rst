@@ -129,8 +129,8 @@ A five-dimensional binary classification dataset is created with the class separ
 
 .. math::
     f(x) = 0.5x_0x_1 - 0.5x_0x_2 - 0.15x_3^2 + 0.1\sum_{i_1}^5x_i + \epsilon
-    f(x) > -1 \rightarrow class 1
-    f(x) < -1 \rightarrow class -1
+    f(x) > -1: class 1
+    f(x) < -1: class -1
 
 where :math:`epsilon` is a normally distributed random variable with zero mean and standard deviation 0.4; introduced 
 to cause the two classes to overlap.
