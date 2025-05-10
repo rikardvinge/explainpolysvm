@@ -197,9 +197,9 @@ Since the trained quadratic kernel SVM is mainly linear, the impact of the indiv
 can be compared with SHAP. This is shown below for an example from the negative class, with the decision function output -1.44, using the function :code:`es.plot_sample_waterfall()`
 
 .. image:: ./media/feature_importance_single_negative_wbcd.png
-    :width: 45 %
+    :width: 49 %
 .. image:: ./media/local_shap_same_format_wbcd.png
-    :width: 45 %
+    :width: 49 %
 
 The two local explanations for this sample are similar both in sign and magnitude. The reason for the different
 number of remaining features is that SHAP calculates the impact of the input features, including interactions with the feature,
