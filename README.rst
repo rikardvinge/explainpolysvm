@@ -224,7 +224,8 @@ Below is a non-exhaustive list of useful and interesting features to add to the 
 Citations
 =========
 
-If you use ExplainPolySVM in your work we would appreciate a citation. Please see the CITATION.cff for citation, or use the following BibText
+If you use ExplainPolySVM in your work we would appreciate a citation. Please see the CITATION.cff, or use the following BibText
+
 .. code-block::
 
     @InProceedings{vinge2025ExpSVM,
