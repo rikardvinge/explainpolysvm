@@ -47,4 +47,4 @@ sources = ["src"]
 dev-mode-dirs = ["src"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["explainpolysvm"]
+packages = ["src/explainpolysvm"]
