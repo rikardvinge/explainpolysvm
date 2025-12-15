@@ -6,7 +6,7 @@ for SVM models trained using the polynomial kernel
 
 :math:`K_p(x,y|r,D,g)=(r+g(x^Ty))^D`,
 
-on binary classification problems. Here :math:`x` and :math:`y` are column vectors and :math:`r`, :math:`g`,
+for binary classification and support vector regression. Here :math:`x` and :math:`y` are column vectors and :math:`r`, :math:`g`,
 and :math:`D` are the independent term, scale coefficient and the degree of the polynomial kernel, respectively.
 The greek letter gamma is often used for :math:`g`.
 
