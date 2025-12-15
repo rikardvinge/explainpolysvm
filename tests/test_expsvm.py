@@ -1,17 +1,15 @@
 import pytest
 import numpy as np
-from .context import expsvm as exp
+import explainpolysvm.expsvm as exp
 from sklearn.datasets import load_breast_cancer, make_classification
 from sklearn.preprocessing import StandardScaler
-from sklearn.svm import SVC
+from sklearn.svm import SVC, SVR
 from sklearn.model_selection import train_test_split
 from typing import Tuple
 import matplotlib
 
 # Fix so pytest assert with numpy datatypes work with numpy >= 2.
-if np.__version__ >= "2.0.0":
-    import math
-    np.math = math
+import math
 
 # Create random number generator for repeatable tests.
 rng = np.random.default_rng(101)
@@ -124,7 +122,7 @@ def polynomial_kernel(x: np.ndarray, y: np.ndarray, r: float, d: int, gamma: flo
     return (r + gamma * np.matmul(x, np.transpose(y))) ** d
 
 
-def create_sklearn_expsvm_models(X_train, y_train, C, degree, gamma, r) -> Tuple[SVC, exp.ExPSVM]:
+def create_sklearn_expsvm_svc(X_train, y_train, C, degree, gamma, r) -> Tuple[SVC, exp.ExPSVM]:
     """
     Train a Scikit-learn SVC svm_model with a polynomial kernel and transform it using ExpSVM. Return both models.
 
@@ -150,12 +148,47 @@ def create_sklearn_expsvm_models(X_train, y_train, C, degree, gamma, r) -> Tuple
     es_model : ExPSVM
         Polynomial SVM model transformed into a compressed linear model
     """
-    # Fit SVM
+    # Fit SV
     kernel = 'poly'
     svm_model = SVC(C=C, kernel=kernel, degree=degree, gamma=gamma, coef0=r)
     svm_model.fit(X_train, y_train)
 
-    es_model = exp.ExPSVM(svc_model=svm_model)
+    es_model = exp.ExPSVM(svm_model=svm_model)
+    es_model.transform_svm()
+    return svm_model, es_model
+
+def create_sklearn_expsvm_svr(X_train, y_train, C, degree, gamma, r) -> Tuple[SVC, exp.ExPSVM]:
+    """
+    Train a Scikit-learn SVC svm_model with a polynomial kernel and transform it using ExpSVM. Return both models.
+
+    Parameters
+    ----------
+    X_train : Numpy ndarray of shape (n_observations, n_features)
+        Training data
+    y_train : Numpy ndarray of shape (n_observations,)
+        Training labels
+    C : float
+        Regularization parameter in SVM
+    degree : int
+        Degree of the polynomial kernel
+    gamma : float or {'scale', 'auto'}
+        Coefficient in the polynomial kernel
+    r : float
+        Independent term in polynomial kernel
+
+    Returns
+    -------
+    svm_model : sklearn.svm.SVC
+        Trained Scikit-learn SVC model with polynomial kernel.
+    es_model : ExPSVM
+        Polynomial SVM model transformed into a compressed linear model
+    """
+    # Fit SV
+    kernel = 'poly'
+    svm_model = SVR(C=C, kernel=kernel, degree=degree, gamma=gamma, coef0=r)
+    svm_model.fit(X_train, y_train)
+
+    es_model = exp.ExPSVM(svm_model=svm_model)
     es_model.transform_svm()
     return svm_model, es_model
 
@@ -702,7 +735,7 @@ class TestExPSVM:
         model = SVC(C=C, kernel=kernel, degree=degree, gamma=gamma, coef0=r)
         model.fit(X_train, y_train)
 
-        es = exp.ExPSVM(svc_model=model)
+        es = exp.ExPSVM(svm_model=model)
 
         es.transform_svm()
         sklearn_df = model.decision_function(X_test)
@@ -741,9 +774,53 @@ class TestExPSVM:
         degree = 3
         gamma = 'scale'
         r = np.sqrt(2)
-        model, es = create_sklearn_expsvm_models(X_train, y_train, C, degree, gamma, r)
+        model, es = create_sklearn_expsvm_svc(X_train, y_train, C, degree, gamma, r)
         sklearn_df = model.decision_function(X_test)
         expsvm_df = es.decision_function(X_test)
+        tol = 1e-10
+        assert np.all(np.abs(expsvm_df - sklearn_df) < tol)
+
+    def test_compare_sklearn_svr_artificial_data_2d(self):
+        """
+        Verify that the ExPSVM decision function and the Scikit-learn SVC decision function produce the same results
+        on a toy dataset with 2 features.
+
+        The dataset consists of one class being everything within the unit circle and the other class a ring concentric
+        with the origin with minimum radius 1 and maximum radius 1.41.
+
+        A tolerance of 1e-10 is used, i.e. the two decision functions should be within 1e-10 from each other on all
+        test samples. The number of test samples is 50.
+        """
+        samples = 100
+
+        max_val = 5
+        x_all = max_val*(rng.random((samples, 2)) - 0.5)
+
+        # Real interaction impact on target 
+        w_x0 = -1
+        w_x1 = -0.5
+        w_x0x0 = 1.5
+        w_x1x1 = 2.
+        w_x0x1 = 0.25
+
+        # Origin shift
+        or0 = 0.2
+        or1 = 0.2
+        zero_level = 5.
+        y = w_x0x0*(x_all[:,0] - or0)**2 + w_x1x1*(x_all[:,1] - or1)**2 + w_x0*x_all[:, 0] + w_x1*x_all[:, 1] + w_x0x1*x_all[:, 0]*x_all[:, 1] - zero_level
+
+        x_train, x_test, y_train, y_test = train_test_split(x_all, y, test_size=10, random_state=10)
+        # Fit SVM
+        C = 0.9
+        degree = 2
+        gamma = 'scale'
+        r = np.sqrt(2)
+
+        # Fit SVM
+        model, es = create_sklearn_expsvm_svr(x_train, y_train, C, degree, gamma, r)
+
+        sklearn_df = model.predict(x_test)
+        expsvm_df = es.decision_function(x_test)
         tol = 1e-10
         assert np.all(np.abs(expsvm_df - sklearn_df) < tol)
 
@@ -770,7 +847,7 @@ class TestExPSVM:
                         p=std_p, intercept=1)
         es.transform_svm()
 
-        fig = es.plot_sample_waterfall(x=std_arr, n_features=2, show=False)
+        fig = es.plot_sample_waterfall(x=std_arr[0, :], n_features=2, show=False)
         assert isinstance(fig, matplotlib.figure.Figure)
 
     def test_plot_sample_waterfall_degree(self, std_arr, std_dual_coef, std_d, std_gamma,
@@ -783,5 +860,5 @@ class TestExPSVM:
                         p=std_p, intercept=1)
         es.transform_svm()
 
-        fig = es.plot_sample_waterfall_degree(x=std_arr, n_degree=2, show=False)
+        fig = es.plot_sample_waterfall_degree(x=std_arr[0,:], n_degree=2, show=False)
         assert isinstance(fig, matplotlib.figure.Figure)

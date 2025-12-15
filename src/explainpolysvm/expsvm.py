@@ -29,11 +29,11 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-from math import comb
+from math import comb, factorial
 import numpy as np
 import itertools as it
 from typing import List, Tuple
-from sklearn.svm import SVC
+from sklearn.svm import SVC, SVR
 from .plot import waterfall, bar
 
 
@@ -168,8 +168,8 @@ class InteractionUtils:
         if len(counts_list) == 0:
             perm_reduction = 1
         else:
-            perm_reduction = np.prod([np.math.factorial(count) for count in counts_list])
-        n_perm = int(np.math.factorial(self.interaction_dim) / perm_reduction)
+            perm_reduction = np.prod([factorial(count) for count in counts_list])
+        n_perm = int(factorial(self.interaction_dim) / perm_reduction)
         return n_perm
 
 
@@ -222,7 +222,8 @@ class ExPSVM:
             Optional, use only if no scikit-learn model is provided.
 
         dual_coef : numpy.ndarray of shape (n_SV, 1)
-            SVM dual coefficients. Same as dual_coef_ in sklearn's SVC. Calculated as dual_coef[i] = alpha[i]*y[i].
+            SVM dual coefficients. Same as dual_coef_ in sklearn's SVC. Calculated as dual_coef[i] = alpha[i]*y[i] for 
+            classification and dual_coef[i] = alpha[i] - alpha_star[i] for regression.
             Optional, use only if no scikit-learn model is provided.
 
         intercept : float
@@ -238,7 +239,7 @@ class ExPSVM:
             Kernel coefficient controlling the relative importance of higher-order terms.
             Optional, use only if no scikit-learn model is provided.
 
-        svc_model : sklearn.svm.SVC
+        svm_model : sklearn.svm.SVC
             Trained Scikit-learn SVC model. Use to simplify creation of ExPSVM object.
             Parameters are extracted automatically from the SVC object.
 
@@ -249,6 +250,9 @@ class ExPSVM:
 
         feature_names : List of strings
             List of feature names in the original space.
+
+        problem_type : str
+            Type of ml algorithm. Currently implemented are: 'class' (or 'classification'), 'reg' (or 'regression')
 
         Attributes
         ----------
@@ -286,28 +290,28 @@ class ExPSVM:
     def __init__(self, sv: np.ndarray = None, dual_coef: np.ndarray = None,
                  intercept: float = None,
                  kernel_d: int = None, kernel_r: float = None, kernel_gamma: float = None,
-                 p: int = None, svc_model: SVC = None, transform: bool = False,
-                 feature_names: List[str] = None
+                 p: int = None, svm_model: SVC | SVR = None, transform: bool = False,
+                 feature_names: List[str] = None, problem_type: str = None
                  ) -> None:
 
-        if svc_model is not None:
-            if svc_model.classes_.size != 2:
-                raise ValueError("Number of classes should be 2. "
-                                 "Current number of classes: {}.".format(svc_model.classes_.size))
+        if svm_model is not None:
+            if isinstance(svm_model, SVC) and svm_model.classes_.size != 2:
+                raise ValueError("Number of classes should be 2 in classification.  Current number of classes: {}.".format(svm_model.classes_.size))
             # Support vectors
-            self.sv = svc_model.support_vectors_
+            self.sv = svm_model.support_vectors_
             # Number of features in original space
-            self.p = svc_model.n_features_in_
+            self.p = svm_model.n_features_in_
             # SVM dual coefficients, equal to alpha_i*y_i in standard SVM formulation.
-            self.dual_coef = np.reshape(svc_model.dual_coef_, (-1, 1))
+            self.dual_coef = np.reshape(svm_model.dual_coef_, (-1, 1))
             # SVM intercept
-            self.intercept = svc_model.intercept_[0]
+            self.intercept = svm_model.intercept_[0]
+            # Kernel parameters
             # Polynomial degree of kernel
-            self.kernel_d = svc_model.degree
+            self.kernel_d = svm_model.degree
             # Constant term in kernel
-            self.kernel_r = svc_model.coef0
+            self.kernel_r = svm_model.coef0
             # Scale in polynomial kernel
-            self.kernel_gamma = svc_model._gamma
+            self.kernel_gamma = svm_model._gamma
         else:
             # Number of features in original space
             if p is None:
@@ -897,7 +901,7 @@ class ExPSVM:
             title += ' (magnitude)'
         return bar(bar_heights, labels, xlabel=xlabel, ylabel=ylabel, title=title, **kwargs)
 
-    def plot_sample_waterfall(self, x: np.ndarray, n_features: int = 10, **kwargs):
+    def plot_sample_waterfall(self, x: np.ndarray, n_features: int = None, **kwargs):
         """
         Visualize interaction importance for a single observation using a waterfall graph.
 
@@ -918,9 +922,10 @@ class ExPSVM:
 
         # Check validity of observation
         x = np.squeeze(x)
-        if len(x.shape) > 1:
-            ValueError(
-                'Input observation x should have dimension (n_feature,). Shape of provided input {}'.format(x.shape))
+        assert len(x.shape) == 1, ValueError('Input observation x should have dimension (n_feature,). Shape of provided input {}'.format(x.shape))
+            
+        if n_features is None:
+            n_features = len(self._interactions)
 
         # Calculate decision function value and components
         y_comp, feat_names = self.decision_function_components(x=x, include_intercept=False,
@@ -942,7 +947,6 @@ class ExPSVM:
         # Instantiate array of bar widths and labels
         bar_widths = np.concatenate(([self.intercept], y_comp_sort[0:n_features]))
         labels = ['Intercept'] + feat_names_sort[0:n_features]
-        # labels = np.concatenate((['intercept'], feat_names_sort[0:n_features]))
 
         # Check if there are any interactions that are not shown
         n_remaining = y_comp_sort.size - n_features
@@ -963,7 +967,7 @@ class ExPSVM:
             n_degree = self.kernel_d
 
         # Calculate decision function value and components
-        y_comp, feat_names = self.decision_function_components(x=x, include_intercept=False,
+        y_comp, _ = self.decision_function_components(x=x, include_intercept=False,
                                                                output_interaction_names=True,
                                                                format_interaction_names=True)
 

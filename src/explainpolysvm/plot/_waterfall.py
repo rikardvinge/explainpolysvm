@@ -55,10 +55,18 @@ def waterfall(bar_widths: np.ndarray, labels: List[str], show: bool = True,
     yticks = np.flip(np.arange(-n_bars, 1))
 
     current_width = 0
+    min_x = np.inf
+    max_x = -np.inf
     for w, y, l in zip(bar_widths, yticks, labels):
         # Plot bar
         c = positive_color if w > 0 else negative_color
         bar = ax.barh(y, w, left=current_width, color=c, align='center')
+        
+        # Update min and max_values
+        if w+current_width < min_x:
+            min_x = w+current_width
+        if w+current_width > max_x:
+            max_x = w+current_width
 
         # Add value label
         if show_values:
@@ -90,6 +98,9 @@ def waterfall(bar_widths: np.ndarray, labels: List[str], show: bool = True,
     ax.set_ylim([ymin, ymax])
     if xlim is not None:
         ax.set_xlim(xlim)
+    # else:
+    #     x_scaling = 0.1*(max_x - min_x)
+    #     ax.set_xlim([min_x-x_scaling, max_x+x_scaling])
 
     if show:
         plt.show()

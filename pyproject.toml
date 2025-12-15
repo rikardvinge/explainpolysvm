@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "explainpolysvm"
-version = "1.0.0"
+version = "1.1.0"
 description = "Module for Global and Local explanations and feature selection for Support Vector Machines trained with polynomial kernels."
 readme = "README.rst"
 requires-python = ">=3.8"
@@ -35,12 +35,16 @@ classifiers=[
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=6.2.5"
+    "pytest>=7.0"
 ]
 
 [project.urls]
 Repository = "https://github.com/rikardvinge/explainpolysvm.git"
 Issues = "https://github.com/rikardvinge/explainpolysvm/issues"
 
-[tool.setuptools]
-license-files = []
+[tool.hatch.build]
+sources = ["src"]
+dev-mode-dirs = ["src"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["explainpolysvm"]

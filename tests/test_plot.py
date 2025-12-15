@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from .context import plot
+from explainpolysvm import plot
 
 
 import matplotlib
