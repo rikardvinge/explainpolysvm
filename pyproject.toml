@@ -16,7 +16,7 @@ dependencies = [
     "scikit-learn>=1.0.2",
     "matplotlib"
 ]
-license = {file = "LICENSE"}
+license = { text = "BSD-3-Clause" }
 keywords=["feature importance", "support vector machine", "svm", "feature selection", "polynomial kernel", "xai", "interaction importance"]
 classifiers=[
         "Development Status :: 5 - Production/Stable",
@@ -45,6 +45,7 @@ Issues = "https://github.com/rikardvinge/explainpolysvm/issues"
 [tool.hatch.build]
 sources = ["src"]
 dev-mode-dirs = ["src"]
+include = ["LICENSE"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/explainpolysvm"]
