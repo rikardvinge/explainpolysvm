@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-import explainpolysvm.expsvm as exp
+from explainpolysvm import expsvm as exp
 from sklearn.datasets import load_breast_cancer, make_classification
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC, SVR
