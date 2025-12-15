@@ -6,7 +6,7 @@ for SVM models trained using the polynomial kernel
 
 :math:`K_p(x,y|r,D,g)=(r+g(x^Ty))^D`,
 
-on binary classification problems. Here :math:`x` and :math:`y` are column vectors and :math:`r`, :math:`g`,
+for binary classification and support vector regression. Here :math:`x` and :math:`y` are column vectors and :math:`r`, :math:`g`,
 and :math:`D` are the independent term, scale coefficient and the degree of the polynomial kernel, respectively.
 The greek letter gamma is often used for :math:`g`.
 
@@ -42,18 +42,18 @@ Usage
 **The ExPSVM module**
 
 The main functionality is provided by the :code:`ExPSVM` module. It interacts closely with Scikit-learn's SVC support
-vector machine but can also be instantiated manually. Using a pretrained Scikit-learn SVC model :code:`svc_model` as
+vector machine but can also be instantiated manually. Using a pretrained Scikit-learn SVC model :code:`svm_model` as
 starting-point, a transformed SVM model using :code:`ExPSVM` can be achieved by
 
 .. code-block::
 
     import expsvm
-    sv = svc_model.support_vectors_
-    dual_coef = svc_model.dual_coef_
-    intercept = svc_model.intercept_
-    d = svc_model.degree
-    r = svc_model.coef0
-    gamma = svc_model.gamma_
+    sv = svm_model.support_vectors_
+    dual_coef = svm_model.dual_coef_
+    intercept = svm_model.intercept_
+    d = svm_model.degree
+    r = svm_model.coef0
+    gamma = svm_model.gamma_
 
     es = expsvm.ExPSVM(sv=sv, dual_coef=dual_coef, intercept=intercept, kernel_d=d, kernel_r=r, kernel_gamma=gamma)
     es.transform_svm()
@@ -63,7 +63,7 @@ Or, simply
 .. code-block::
 
     import expsvm
-    es = expsvm.ExPSVM(svc_model=svc_model, transform=True)
+    es = expsvm.ExPSVM(svm_model=svm_model, transform=True)
 
 Feature importance is retrieved by
 
