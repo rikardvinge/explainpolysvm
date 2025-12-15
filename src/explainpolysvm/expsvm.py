@@ -32,7 +32,7 @@
 from math import comb, factorial
 import numpy as np
 import itertools as it
-from typing import List, Tuple
+from typing import List, Tuple, Union
 from sklearn.svm import SVC, SVR
 from .plot import waterfall, bar
 
@@ -290,7 +290,7 @@ class ExPSVM:
     def __init__(self, sv: np.ndarray = None, dual_coef: np.ndarray = None,
                  intercept: float = None,
                  kernel_d: int = None, kernel_r: float = None, kernel_gamma: float = None,
-                 p: int = None, svm_model: SVC | SVR = None, transform: bool = False,
+                 p: int = None, svm_model: Union[SVC, SVR, None] = None, transform: bool = False,
                  feature_names: List[str] = None, problem_type: str = None
                  ) -> None:
 
