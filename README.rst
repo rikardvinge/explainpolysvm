@@ -205,7 +205,7 @@ number of remaining features is that SHAP calculates the impact of the input fea
 while ExplainPolySVM calculates the impact on the individual interactions.
 
 A note on contributions and package maintenance
-=============================
+===============================================
 
 So far, ExplainPolySVM is developed by a single person. If you are missing a feature or have found a solution to a bug, please don't hesitate to contribute to the codebase.
 How to do this? - Please find instructions in `CONTRIBUTING.md <https://github.com/rikardvinge/explainpolysvm/blob/main/.github/CONTRIBUTING.md>`_.
