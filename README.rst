@@ -204,11 +204,11 @@ The two local explanations for this sample are similar both in sign and magnitud
 number of remaining features is that SHAP calculates the impact of the input features, including interactions with the feature,
 while ExplainPolySVM calculates the impact on the individual interactions.
 
-A note on package maintenance
+A note on contributions and package maintenance
 =============================
 
-So far, ExplainPolySVM is developed by a single person. No promises will be made on maintenance nor expansions of this package.
-Please let me know if you are interested in continuing its development and feel free to fork or PR!
+So far, ExplainPolySVM is developed by a single person. If you are missing a feature or have found a solution to a bug, please don't hesitate to contribute to the codebase.
+How to do this? - Please find instructions in `CONTRIBUTING.md <https://github.com/rikardvinge/explainpolysvm/blob/main/.github/CONTRIBUTING.md>` file under `.github/`.
 
 Future development
 ==================
@@ -218,7 +218,7 @@ Below is a non-exhaustive list of useful and interesting features to add to the 
 - Add support for general polynomial kernels. In the current state, only the standard polynomial kernel is implemented; but any arbitrary polynomial kernel is expressible in the same way as the standard kernel. The only requirement this module have is that we can express any coefficients that are multiplied to the sum of the transformed support vectors and to keep track of the number of duplicates of the interactions.
 - Add support for multi-class problems.
 - Add support for the RBF Kernel by truncating the corresponding power series.
-- Investigate if least-square SVM, support vector regression, one-class SVM, etc. can be expressed in similar terms as done in this project for the standard SVM.
+- Investigate if least-square SVM, one-class SVM, etc. can be expressed in similar terms as done in this project for the standard SVM.
 
 Citations
 =========
