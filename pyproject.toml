@@ -43,9 +43,11 @@ Repository = "https://github.com/rikardvinge/explainpolysvm.git"
 Issues = "https://github.com/rikardvinge/explainpolysvm/issues"
 
 [tool.hatch.build]
-sources = ["src"]
 dev-mode-dirs = ["src"]
 include = ["LICENSE"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/explainpolysvm"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/explainpolysvm", "tests", "LICENSE", "README.rst", "pyproject.toml", "pytest.ini"]
