@@ -635,6 +635,86 @@ class TestExPSVM:
         cs = np.cumsum(sorted_lm) / (np.cumsum(sorted_lm)[-1])
         assert np.all(set(es.linear_model[mask, 0]) == set(sorted_lm[cs < frac_feat_imp]))
 
+    def test_feature_importance_masked_linear_model(self, std_arr, std_dual_coef, std_d, std_gamma,
+                                                    std_r, std_p, std_mask, std_lin_model):
+        """
+        Verify that ExPSVM.feature_importance() pairs each interaction weight with the name of the
+        interaction it belongs to when the linear model has been masked in transform_svm().
+        """
+        es = exp.ExPSVM(sv=std_arr, dual_coef=std_dual_coef,
+                        kernel_d=std_d, kernel_r=std_r, kernel_gamma=std_gamma,
+                        p=std_p, intercept=0)
+        es._set_transform()
+        es.set_mask(mask=std_mask)
+        es.transform_svm(mask=True)
+
+        feat_importance, feat_names, _ = es.feature_importance(include_intercept=False)
+
+        # The masked model holds the interactions of std_mask with the weights of the full model.
+        true_lin_model = np.squeeze(std_lin_model)
+        true_importance = {name: np.abs(weight) for name, weight
+                           in zip(es._interactions[std_mask], true_lin_model[std_mask])}
+
+        assert len(feat_names) == np.sum(std_mask)
+        for name, importance in zip(feat_names, feat_importance):
+            assert np.abs(true_importance[name] - importance) < 1e-10
+
+    def test_get_linear_model_masked_dimension(self, std_arr, std_dual_coef, std_d, std_gamma,
+                                               std_r, std_p, std_mask, std_lin_model):
+        """
+        Verify that ExPSVM.get_linear_model() applies the interaction dimension among the interactions
+        of a masked linear model.
+        """
+        es = exp.ExPSVM(sv=std_arr, dual_coef=std_dual_coef,
+                        kernel_d=std_d, kernel_r=std_r, kernel_gamma=std_gamma,
+                        p=std_p, intercept=0)
+        es._set_transform()
+        es.set_mask(mask=std_mask)
+        es.transform_svm(mask=True)
+
+        # std_mask holds second order interactions only.
+        true_lin_model = np.squeeze(std_lin_model)
+        assert np.all(np.abs(es.get_linear_model(d=2)[:, 0] - true_lin_model[std_mask]) < 1e-10)
+        assert es.get_linear_model(d=1).size == 0
+
+    def test_set_mask_masked_linear_model(self, std_arr, std_dual_coef, std_d, std_gamma,
+                                          std_r, std_p, std_mask, std_lin_model):
+        """
+        Verify that ExPSVM.set_mask() selects interactions of a masked linear model and returns a mask
+        that spans all interactions in _interactions.
+        """
+        es = exp.ExPSVM(sv=std_arr, dual_coef=std_dual_coef,
+                        kernel_d=std_d, kernel_r=std_r, kernel_gamma=std_gamma,
+                        p=std_p, intercept=0)
+        es._set_transform()
+        es.set_mask(mask=std_mask)
+        es.transform_svm(mask=True)
+
+        # Select the most important of the two interactions in std_mask, that is, '0,2'.
+        es.set_mask(n_interactions=1)
+        true_bool = np.array([False, False, False,
+                              False, False, True, False, False, False])
+        assert es.interaction_mask.size == std_mask.size
+        assert np.all(es.interaction_mask == true_bool)
+
+    def test_feature_selection_minimum_selection(self, std_arr, std_dual_coef, std_d, std_gamma,
+                                                 std_r, std_p):
+        """
+        Verify that ExPSVM.feature_selection() selects at least one interaction when the requested
+        fraction is too small to select any interaction.
+        """
+        es = exp.ExPSVM(sv=std_arr, dual_coef=std_dual_coef,
+                        kernel_d=std_d, kernel_r=std_r, kernel_gamma=std_gamma,
+                        p=std_p, intercept=0)
+        es.transform_svm()
+
+        # A fraction of 0.05 of 9 interactions rounds down to zero interactions.
+        mask = es.feature_selection(frac_interactions=0.05)
+        assert np.sum(mask) == 1
+
+        mask = es.feature_selection(frac_importance=1e-6)
+        assert np.sum(mask) == 1
+
     def test_compare_sklearn_svc_artificial_data_2d(self):
         """
         Verify that the ExPSVM decision function and the Scikit-learn SVC decision function produce the same results
