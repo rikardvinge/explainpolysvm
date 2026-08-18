@@ -1,6 +1,8 @@
 ExplainPolySVM
 ==============
 
+|pypi| |python| |tests| |docs| |license| |paper|
+
 Welcome to ExplainPolySVM, a python package for feature importance analysis and feature selection
 for SVM models trained using the polynomial kernel
 
@@ -12,10 +14,29 @@ The greek letter gamma is often used for :math:`g`.
 
 To express feature importance, the trained SVM model is transformed into a compressed linear version of the polynomial transformation used in the polynomial kernel.
 
+**Documentation**: https://rikardvinge.github.io/explainpolysvm
+
+What ExplainPolySVM provides
+============================
+
+- Global explanations: the weight of every feature interaction in the decision function.
+- Local explanations: the contribution of every interaction to an individual prediction.
+- Interactions of any order, without approximation. The transformed model reproduces the decision
+  function of the original SVM to numerical precision.
+- Degree importance: how much of the decision function each degree of the polynomial kernel accounts
+  for, at a cost independent of the number of interactions.
+- Post-hoc feature selection by masking interactions in the trained model.
+- Binary classification (:code:`SVC`) and regression (:code:`SVR`).
+
 Where to get
 ============
 
 The source code is currently hosted on pip and on GitHub at: https://github.com/rikardvinge/explainpolysvm
+
+The documentation, including the API reference and guidance on interpreting the explanations, is at
+https://rikardvinge.github.io/explainpolysvm. Released versions are listed in the
+`changelog <https://github.com/rikardvinge/explainpolysvm/blob/main/CHANGELOG.md>`_, and runnable
+examples in the `examples directory <https://github.com/rikardvinge/explainpolysvm/tree/main/examples>`_.
 
 Install with pip using
 
@@ -140,7 +161,7 @@ sampled from the formula above, achieving an accuracy of 95.7% on a held-out tes
 
 The global explanations are given by ExplainPolySVM are shown below
 
-.. image:: https://github.com/rikardvinge/explainpolysvm/blob/main/media/feature_importance_signed_artificial_strong_1dpd.png
+.. image:: https://raw.githubusercontent.com/rikardvinge/explainpolysvm/main/media/feature_importance_signed_artificial_strong_1dpd.png
     :width: 80%
 
 The following code can be used to compute and visualize the interaction importance
@@ -186,7 +207,7 @@ In the example, a 2D SVM is trained on the Wisonsin Breast Cancer Dataset, achie
 
 By standardizing the features to zero mean and unit variance, we can calculate the global explanations after training, as shown below.
 
-.. image:: https://github.com/rikardvinge/explainpolysvm/blob/main/media/feature_importance_signed_wbcd.png
+.. image:: https://raw.githubusercontent.com/rikardvinge/explainpolysvm/main/media/feature_importance_signed_wbcd.png
     :width: 80%
 
 Even though a 2D model was trained, all but one of the 30 input features are the most important in the model, while 
@@ -195,9 +216,9 @@ the quadratic interactions are less impactful. This indicates that a linear mode
 Since the trained quadratic kernel SVM is mainly linear, the impact of the individual input features
 can be compared with SHAP. This is shown below for an example from the negative class, with the decision function output -1.44, using the function :code:`es.plot_sample_waterfall()`
 
-.. image:: https://github.com/rikardvinge/explainpolysvm/blob/main/media/feature_importance_single_negative_wbcd.png
+.. image:: https://raw.githubusercontent.com/rikardvinge/explainpolysvm/main/media/feature_importance_single_negative_wbcd.png
     :width: 49 %
-.. image:: https://github.com/rikardvinge/explainpolysvm/blob/main/media/local_shap_same_format_wbcd.png
+.. image:: https://raw.githubusercontent.com/rikardvinge/explainpolysvm/main/media/local_shap_same_format_wbcd.png
     :width: 49 %
 
 The two local explanations for this sample are similar both in sign and magnitude. The reason for the different
@@ -208,7 +229,8 @@ A note on contributions and package maintenance
 ===============================================
 
 So far, ExplainPolySVM is developed by a single person. If you are missing a feature or have found a solution to a bug, please don't hesitate to contribute to the codebase.
-How to do this? - Please find instructions in CONTRIBUTING.md under .github/.
+How to do this? - Please find instructions in
+`CONTRIBUTING.md <https://github.com/rikardvinge/explainpolysvm/blob/main/.github/CONTRIBUTING.md>`_ under .github/.
 
 Future development
 ==================
@@ -243,3 +265,29 @@ If you use ExplainPolySVM in your work we would appreciate a citation. Please se
     abstract="Researchers and practitioners of machine learning nowadays rarely overlook the potential of using explainable AI methods to understand models and their predictions. These explainable AI methods mainly focus on the importance of individual input features. However, as important as the input features themselves, are the interactions between them. Methods such as the model-agnostic but computationally expensive Friedman's H-statistic and SHAP investigate and estimate the impact of interactions between the features. Due to computational constraints, the investigation is often limited to second-order interactions. In this paper, we present a novel, model-specific method to explain the impact of feature interactions in SVM classifiers with polynomial kernels. The method is computationally frugal and calculates the interaction importance exactly for any order of interaction. Explainability is achieved by mathematical transformation to a linear model with full fidelity to the original model. Further, we show how the model provides for both global and local explanations, and facilitates post-hoc feature selection. We demonstrate the method on two datasets; one is an artificial dataset where H-statistics requires extra care to provide useful interpretation; and one on the real-world scenario of the Wisconsin Breast Cancer dataset. Our experiments show that the method provides reasonable, easy to interpret and fast to compute explanations of the trained model.",
     isbn="978-3-031-91398-3"
     }
+
+.. Badge definitions, referenced at the top of this file.
+
+.. |pypi| image:: https://img.shields.io/pypi/v/explainpolysvm.svg
+    :target: https://pypi.org/project/explainpolysvm/
+    :alt: PyPI version
+
+.. |python| image:: https://img.shields.io/pypi/pyversions/explainpolysvm.svg
+    :target: https://pypi.org/project/explainpolysvm/
+    :alt: Supported Python versions
+
+.. |tests| image:: https://github.com/rikardvinge/explainpolysvm/actions/workflows/python-package.yml/badge.svg
+    :target: https://github.com/rikardvinge/explainpolysvm/actions/workflows/python-package.yml
+    :alt: Tests
+
+.. |docs| image:: https://github.com/rikardvinge/explainpolysvm/actions/workflows/docs.yml/badge.svg
+    :target: https://rikardvinge.github.io/explainpolysvm
+    :alt: Documentation
+
+.. |license| image:: https://img.shields.io/pypi/l/explainpolysvm.svg
+    :target: https://github.com/rikardvinge/explainpolysvm/blob/main/LICENSE
+    :alt: License
+
+.. |paper| image:: https://img.shields.io/badge/DOI-10.1007%2F978--3--031--91398--3__34-blue
+    :target: https://doi.org/10.1007/978-3-031-91398-3_34
+    :alt: Paper
