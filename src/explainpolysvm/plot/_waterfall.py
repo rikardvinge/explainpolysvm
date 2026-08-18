@@ -71,7 +71,7 @@ def waterfall(bar_widths: np.ndarray, labels: List[str], show: bool = True,
         # Add value label
         if show_values:
             add_sign = '+' if w > 0 else ''
-            ax.bar_label(bar, [add_sign + '{:.1e}'.format(w)], label_type='edge', color=c)
+            ax.bar_label(bar, [add_sign + f'{w:.1e}'], label_type='edge', color=c)
 
         if (n_bars > 1) & (y < 0):
             # Plot vertical dashed line to previous bar
@@ -85,7 +85,7 @@ def waterfall(bar_widths: np.ndarray, labels: List[str], show: bool = True,
         ax.vlines(bar_sum, ymin+1, 1.4 - n_bars, color='k', linestyle='--', clip_on=False)
 
         # Write decision function value
-        ax.text(bar_sum, ymin+1, 'f(x)={:.2e}'.format(bar_sum), ha='center', va='top')
+        ax.text(bar_sum, ymin+1, f'f(x)={bar_sum:.2e}', ha='center', va='top')
 
     # Add vertical line at x=0
     ax.vlines(0, ymin, 1, linestyle='--', color='tab:gray', zorder=-np.inf)

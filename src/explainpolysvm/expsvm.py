@@ -296,7 +296,8 @@ class ExPSVM:
 
         if svm_model is not None:
             if isinstance(svm_model, SVC) and svm_model.classes_.size != 2:
-                raise ValueError("Number of classes should be 2 in classification.  Current number of classes: {}.".format(svm_model.classes_.size))
+                raise ValueError(f"Number of classes should be 2 in classification.  "
+                                 f"Current number of classes: {svm_model.classes_.size}.")
             # Support vectors
             self.sv = svm_model.support_vectors_
             # Number of features in original space
@@ -409,11 +410,47 @@ class ExPSVM:
         """
         return self._interaction_dims[self.get_interaction_index(**kwargs)]
 
+    def _get_model_index(self, **kwargs) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Resolve selection criteria into one index into _interactions and one index into linear_model.
+
+        The linear model spans all interactions in _interactions, unless it was masked in
+        transform_svm(), in which case it spans only the interactions in interaction_mask. The two
+        returned indexes therefore have different lengths for a masked linear model. Both indexes
+        select the same interactions, which is what keeps interaction weights paired with the correct
+        interaction names.
+
+        Masking is enforced when the linear model is masked, since interactions outside
+        interaction_mask are not part of the linear model.
+
+        Parameters
+        ----------
+        kwargs : Arguments passed to get_interaction_index(). Used to reduce the number of interactions.
+
+        Returns
+        -------
+        interaction_ind : Numpy ndarray of shape (n_interactions,)
+            Boolean array with True at the selected elements of _interactions.
+        model_ind : Numpy ndarray of shape (n_interactions_in_linear_model,)
+            Boolean array with True at the selected elements of linear_model.
+        """
+        if self.linear_model_is_masked:
+            # Interactions outside the mask are not part of the masked linear model.
+            kwargs['mask'] = True
+            interaction_ind = self.get_interaction_index(**kwargs)
+            # Restrict the index to the interactions spanned by the masked linear model.
+            model_ind = interaction_ind[self.interaction_mask]
+        else:
+            interaction_ind = self.get_interaction_index(**kwargs)
+            model_ind = interaction_ind
+        return interaction_ind, model_ind
+
     def get_linear_model(self, **kwargs) -> np.ndarray:
         """
         Returns numpy array of the linear model transformed from the polynomial SVM.
-        If linear_model_is_masked is False, kwargs can be supplied to include only selected
-        interactions, as controlled by get_interaction_index().
+        kwargs can be supplied to include only selected interactions, as controlled by
+        get_interaction_index(). If the linear model was masked in transform_svm(), the selection is
+        applied among the interactions of the masked model.
 
         Parameters
         ----------
@@ -424,10 +461,8 @@ class ExPSVM:
         Linear model : Numpy ndarray of shape (n_interactions, 1)
             Linear model of the polynomial SVM model.
         """
-        if self.linear_model_is_masked:
-            return self.linear_model
-        else:
-            return self.linear_model[self.get_interaction_index(**kwargs), :]
+        _, model_ind = self._get_model_index(**kwargs)
+        return self.linear_model[model_ind, :]
 
     def set_feature_names(self, feature_names: List[str]) -> None:
         """
@@ -631,7 +666,7 @@ class ExPSVM:
         if len(x.shape) == 1:
             x = x.reshape((1, -1))
         if len(x.shape) > 2:
-            raise ValueError("x should be 2-dimensional. Shape of x is {}.".format(x.shape))
+            raise ValueError(f"x should be 2-dimensional. Shape of x is {x.shape}.")
         use_mask = mask or self.linear_model_is_masked
         # Transform observations to compressed linear form, possibly masked.
         x_trans = self._compress_transform(x=x, reduce_memory=reduce_memory,
@@ -705,11 +740,14 @@ class ExPSVM:
             Sorting order to get feat_names from _interactions.
         """
 
+        # Get indexes of the selected interactions in _interactions and in the linear model.
+        interaction_ind, model_ind = self._get_model_index(**kwargs)
+
         # Get interaction importance
-        feat_importance_signed = np.squeeze(self.get_linear_model(**kwargs)[:, 0])
+        feat_importance_signed = self.linear_model[model_ind, 0]
 
         # Get feature names
-        feat_names = self.get_interactions(**kwargs)
+        feat_names = self._interactions[interaction_ind]
 
         # Append intercept
         if include_intercept:
@@ -745,6 +783,13 @@ class ExPSVM:
 
         Importance is measured by the magnitude of the interaction in the linear model.
 
+        At least one interaction is always selected. Fractions small enough to select no interaction
+        at all are rounded up to a single interaction.
+
+        If the linear model was masked in transform_svm(), the selection is made among the
+        interactions of the masked model. The returned mask still spans all interactions in
+        _interactions, so it can be passed to set_mask() as usual.
+
         Parameters
         ----------
         n_interactions : int
@@ -762,27 +807,39 @@ class ExPSVM:
 
         feat_imp, _, sort_order = self.feature_importance(include_intercept=False)
 
+        # Number of interactions to select from. Equal to the size of the linear model, which is
+        # smaller than _interactions if the linear model was masked in transform_svm().
+        n_available = feat_imp.size
+
         if n_interactions is not None:
-            if (n_interactions < 1) or (n_interactions > self._interactions.size):
-                raise ValueError("n_feat should be an integer in the range [0,{}]. Current value: {}"
-                                 .format(self._interactions.size, n_interactions))
+            if (n_interactions < 1) or (n_interactions > n_available):
+                raise ValueError(f"n_feat should be an integer in the range [0,{n_available}]. "
+                                 f"Current value: {n_interactions}")
         elif frac_interactions is not None:
             if (frac_interactions <= 0) or (frac_interactions > 1):
-                raise ValueError("frac_feat should be an integer in the range ]0,1]. Current value: {}"
-                                 .format(frac_interactions))
-            n_interactions = int(frac_interactions * self._interactions.size)
+                raise ValueError(f"frac_feat should be an integer in the range ]0,1]. "
+                                 f"Current value: {frac_interactions}")
+            n_interactions = max(1, int(frac_interactions * n_available))
         elif frac_importance is not None:
             if (frac_importance <= 0) or (frac_importance > 1):
-                raise ValueError("frac_feat_imp should be an integer in the range ]0,1]. Current value: {}"
-                                 .format(frac_importance))
+                raise ValueError(f"frac_feat_imp should be an integer in the range ]0,1]. "
+                                 f"Current value: {frac_importance}")
             fi_csum = np.cumsum(feat_imp)
 
-            n_interactions = int(np.sum((fi_csum / fi_csum[-1]) <= frac_importance))
+            n_interactions = max(1, int(np.sum((fi_csum / fi_csum[-1]) <= frac_importance)))
         else:
-            n_interactions = self._interactions.size
+            n_interactions = n_available
+
+        # Translate the selection into positions in _interactions. The sorting order refers to the
+        # linear model, which spans only the masked interactions if the linear model was masked.
+        if self.linear_model_is_masked:
+            model_positions = np.flatnonzero(self.interaction_mask)
+            selected = model_positions[sort_order[0:n_interactions]]
+        else:
+            selected = sort_order[0:n_interactions]
 
         interaction_mask = np.full((self._interactions.size,), False)
-        interaction_mask[sort_order[0:n_interactions]] = True
+        interaction_mask[selected] = True
         return interaction_mask
 
     def set_mask(self, mask: np.ndarray = None, interaction_strs: List[str] = None, **kwargs):
@@ -806,7 +863,7 @@ class ExPSVM:
             if mask.dtype == bool:
                 self.interaction_mask = mask
             else:
-                raise TypeError("mask should have dtype bool. Current type: {}".format(mask.dtype))
+                raise TypeError(f"mask should have dtype bool. Current type: {mask.dtype}")
         elif interaction_strs:
             if interaction_strs is not None:
                 self.interaction_mask = self.get_interaction_index(interaction_strs=interaction_strs)
@@ -839,7 +896,7 @@ class ExPSVM:
                 indices = np.arange(self.p)
                 counts = [np.count_nonzero(interaction == ind) for ind in indices]
                 counts_str = ''.join(
-                    ['$x_{{{}}}^{{{}}}$'.format(i, c) if c > 1 else '$x_{{{}}}$'.format(i) if c == 1 else ''
+                    [f'$x_{{{i}}}^{{{c}}}$' if c > 1 else f'$x_{{{i}}}$' if c == 1 else ''
                      for i, c in enumerate(counts)])
 
                 formatted_strs.append(counts_str)
@@ -922,8 +979,10 @@ class ExPSVM:
 
         # Check validity of observation
         x = np.squeeze(x)
-        assert len(x.shape) == 1, ValueError('Input observation x should have dimension (n_feature,). Shape of provided input {}'.format(x.shape))
-            
+        if len(x.shape) != 1:
+            raise ValueError(f'Input observation x should have dimension (n_feature,). '
+                             f'Shape of provided input {x.shape}')
+
         if n_features is None:
             n_features = len(self._interactions)
 
@@ -960,8 +1019,8 @@ class ExPSVM:
         # Check validity of observation
         x = np.squeeze(x)
         if len(x.shape) > 1:
-            ValueError(
-                'Input observation x should have dimension (n_feature,). Shape of provided input {}'.format(x.shape))
+            raise ValueError(f'Input observation x should have dimension (n_feature,). '
+                             f'Shape of provided input {x.shape}')
 
         if (n_degree is None) | (n_degree > self.kernel_d):
             n_degree = self.kernel_d
