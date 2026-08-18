@@ -222,7 +222,7 @@ class ExPSVM:
             Optional, use only if no scikit-learn model is provided.
 
         dual_coef : numpy.ndarray of shape (n_SV, 1)
-            SVM dual coefficients. Same as dual_coef_ in sklearn's SVC. Calculated as dual_coef[i] = alpha[i]*y[i] for 
+            SVM dual coefficients. Same as ``dual_coef_`` in sklearn's SVC. Calculated as dual_coef[i] = alpha[i]*y[i] for
             classification and dual_coef[i] = alpha[i] - alpha_star[i] for regression.
             Optional, use only if no scikit-learn model is provided.
 
