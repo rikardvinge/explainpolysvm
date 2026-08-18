@@ -6,8 +6,8 @@ authors:
     given-names: Rikard
     orcid: https://orcid.org/0000-0002-7306-3403
 title: "ExplainPolySVM"
-version: 1.1.4
-date-released: 2026-08-12
+version: 1.2.0
+date-released: 2026-08-18
 url: https://github.com/rikardvinge/explainpolysvm
 preferred-citation:
   type: conference-paper
