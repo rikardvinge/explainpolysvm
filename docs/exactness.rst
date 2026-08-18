@@ -23,6 +23,15 @@ the redundancy between permutation-equivalent interactions is what makes that af
 Differences at the level of :math:`10^{-12}` or so between the two decision functions are ordinary
 floating-point accumulation, not a modelling error.
 
+Degree contributions are also exact
+-----------------------------------
+
+:code:`degree_contributions()` evaluates the polynomial kernel expansion in closed form rather than by
+summing interactions, but it computes the same quantity: each column matches the sum of the weighted
+interactions of that degree, and the columns plus the intercept sum to the decision function. The test
+suite asserts both, again at :math:`10^{-10}`. Since the calculation never builds the expansion, it is
+exact for models that are far too large to transform.
+
 Masking makes the model deliberately approximate
 ------------------------------------------------
 

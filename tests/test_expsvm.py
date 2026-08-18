@@ -381,13 +381,22 @@ class TestExPSVM:
 
     def test_poly_coef(self, std_p, std_d, std_r, std_gamma):
         """
-        Verify that ExPSVM._poly_coef are correctly set after running ExPSVM._set_transform().
+        Verify that the ExPSVM.poly_coef property calculates the constants of the polynomial kernel at
+        the first use and reuses them afterwards.
         """
         es = exp.ExPSVM(sv=None, dual_coef=None,
                         kernel_d=std_d, kernel_r=std_r, kernel_gamma=std_gamma,
                         p=std_p, intercept=None)
-        es._set_transform()
-        assert es._poly_coef == {1: 2, 2: 1}
+
+        # The constants are not calculated until they are used.
+        assert es._poly_coef == {}
+
+        # The constant of degree 0 is included, unlike in the linear model where it is not used.
+        assert es.poly_coef == {0: 1, 1: 2, 2: 1}
+
+        # The constants are calculated once and stored.
+        assert es._poly_coef == {0: 1, 1: 2, 2: 1}
+        assert es.poly_coef is es._poly_coef
 
     def test_transform_svm(self, std_p, std_d, std_r, std_arr,
                            std_dual_coef, std_lin_model, std_gamma,
@@ -511,6 +520,166 @@ class TestExPSVM:
         test_comp, test_feat = es.decision_function_components(std_arr, output_interaction_names=True)
         assert np.all(test_comp == true_components)
         assert np.all(test_feat == true_feat)
+
+    def test_degree_contributions(self, std_p, std_d, std_r, std_arr, std_gamma,
+                                  std_dual_coef, std_intercept):
+        """
+        Verify that ExPSVM.degree_contributions() reproduces hand-calculated contributions and that the
+        contributions and the intercept sum to the decision function.
+        """
+        es = exp.ExPSVM(sv=std_arr, dual_coef=std_dual_coef,
+                        kernel_d=std_d, kernel_r=std_r, kernel_gamma=std_gamma,
+                        p=std_p, intercept=std_intercept)
+
+        # Contributions of the observation [1, 2, 3]. The inner products with the support vectors are
+        # 14 and 32. With (2 choose 1)*r^1*gamma = 2 and (2 choose 2)*r^0*gamma^2 = 1, the degrees
+        # contribute 2*(10*14 - 0.1*32) and 10*14^2 - 0.1*32^2.
+        true_contributions = np.array([[273.6, 1857.6]])
+        tol = 1e-10
+        contributions = es.degree_contributions(std_arr[0, :])
+        assert np.all(np.abs(contributions - true_contributions) < tol)
+
+        # The degrees and the intercept sum to the decision function.
+        es.transform_svm()
+        contributions = es.degree_contributions(std_arr)
+        df = es.decision_function(std_arr)
+        assert np.all(np.abs(np.sum(contributions, axis=1) + std_intercept - df) < tol)
+
+        # The zeroth degree is r^kernel_d times the sum of the dual coefficients, here 10 - 0.1.
+        contributions = es.degree_contributions(std_arr, include_d0=True)
+        assert np.all(np.abs(contributions[:, 0] - 9.9) < tol)
+        assert contributions.shape == (std_arr.shape[0], std_d + 1)
+
+        # The intercept is prepended when asked for.
+        contributions = es.degree_contributions(std_arr, include_intercept=True)
+        assert np.all(np.abs(contributions[:, 0] - std_intercept) < tol)
+        assert contributions.shape == (std_arr.shape[0], std_d + 1)
+
+    def test_degree_contributions_sklearn(self):
+        """
+        Verify that ExPSVM.degree_contributions() sums to the decision function of Scikit-learn's SVC
+        and SVR, and that each degree matches the sum of the interactions of that degree.
+        """
+        n_sample = 50
+        x_train, y_train = make_classification(n_samples=n_sample, n_features=4, random_state=101)
+        tol = 1e-10
+
+        for degree, r in [(3, 1.7), (3, 0.), (2, 2.5)]:
+            model, es = create_sklearn_expsvm_svc(x_train, y_train, C=1., degree=degree,
+                                                  gamma='scale', r=r)
+            contributions = es.degree_contributions(x_train)
+
+            # Compare to the sum of the interactions of each degree in the linear model.
+            components = es.decision_function_components(x_train, include_intercept=False)
+            for d in np.arange(1, es.kernel_d + 1):
+                true_contribution = np.sum(components[:, es._interaction_dims == d], axis=1)
+                assert np.all(np.abs(contributions[:, d - 1] - true_contribution) < tol)
+
+            # Compare the sum of the degrees to the decision function of the SVM.
+            assert np.all(np.abs(np.sum(contributions, axis=1) + es.intercept
+                                 - model.decision_function(x_train)) < tol)
+
+            # The dual coefficients of a trained SVM sum to zero, so degree 0 contributes nothing.
+            assert np.all(np.abs(es.degree_contributions(x_train, include_d0=True)[:, 0]) < tol)
+
+            # With an independent term of zero, only the highest degree contributes.
+            if r == 0.:
+                assert np.all(np.abs(contributions[:, 0:-1]) < tol)
+
+        # Regression is handled through the dual coefficients, exactly as classification is.
+        y_reg = np.sum(x_train, axis=1)
+        model, es = create_sklearn_expsvm_svr(x_train, y_reg, C=10., degree=3, gamma='scale', r=1.5)
+        contributions = es.degree_contributions(x_train)
+        assert np.all(np.abs(np.sum(contributions, axis=1) + es.intercept - model.predict(x_train)) < tol)
+
+    def test_degree_contributions_without_transform(self, std_p, std_d, std_r, std_arr, std_gamma,
+                                                    std_dual_coef, std_intercept):
+        """
+        Verify that ExPSVM.degree_contributions() does not require a call to ExPSVM.transform_svm() and
+        that it ignores the interaction mask.
+        """
+        es = exp.ExPSVM(sv=std_arr, dual_coef=std_dual_coef,
+                        kernel_d=std_d, kernel_r=std_r, kernel_gamma=std_gamma,
+                        p=std_p, intercept=std_intercept)
+
+        # No transformation has been made, so the linear model is still empty.
+        contributions = es.degree_contributions(std_arr)
+        assert es.linear_model.size == 0
+        assert contributions.shape == (std_arr.shape[0], std_d)
+
+        # Masking the linear model does not change the degree contributions.
+        es.transform_svm()
+        es.set_mask(n_interactions=1)
+        tol = 1e-10
+        assert np.all(np.abs(es.degree_contributions(std_arr) - contributions) < tol)
+
+    def test_degree_contributions_reduce_memory(self, std_p, std_d, std_r, std_arr, std_gamma,
+                                                std_dual_coef, std_intercept):
+        """
+        Verify that ExPSVM.degree_contributions() returns the same contributions when the observations
+        are handled in chunks, and that a single observation can be provided as a one-dimensional array.
+        """
+        es = exp.ExPSVM(sv=std_arr, dual_coef=std_dual_coef,
+                        kernel_d=std_d, kernel_r=std_r, kernel_gamma=std_gamma,
+                        p=std_p, intercept=std_intercept)
+
+        tol = 1e-10
+        contributions = es.degree_contributions(std_arr)
+        assert np.all(np.abs(es.degree_contributions(std_arr, chunk_size=1) - contributions) < tol)
+        assert np.all(np.abs(es.degree_contributions(std_arr, chunk_size=100) - contributions) < tol)
+        assert np.all(np.abs(es.degree_contributions(std_arr, reduce_memory=True) - contributions) < tol)
+
+        # A single observation, provided as a one-dimensional array.
+        single = es.degree_contributions(std_arr[0, :])
+        assert single.shape == (1, std_d)
+        assert np.all(np.abs(single[0, :] - contributions[0, :]) < tol)
+
+        with pytest.raises(ValueError):
+            es.degree_contributions(std_arr, chunk_size=0)
+
+        with pytest.raises(ValueError):
+            es.degree_contributions(np.zeros((2, 2, std_p)))
+
+    def test_degree_importance(self, std_p, std_d, std_r, std_arr, std_gamma,
+                               std_dual_coef, std_intercept):
+        """
+        Verify that ExPSVM.degree_importance() aggregates the degree contributions as requested and
+        defaults to using the support vectors.
+        """
+        es = exp.ExPSVM(sv=std_arr, dual_coef=std_dual_coef,
+                        kernel_d=std_d, kernel_r=std_r, kernel_gamma=std_gamma,
+                        p=std_p, intercept=std_intercept)
+        contributions = es.degree_contributions(std_arr)
+        tol = 1e-10
+
+        # Magnitudes are aggregated by default.
+        importance, spread, degree_names = es.degree_importance(std_arr)
+        assert np.all(np.abs(importance - np.mean(np.abs(contributions), axis=0)) < tol)
+        assert np.all(np.abs(spread - np.std(np.abs(contributions), axis=0)) < tol)
+        assert degree_names == ['Degree 1', 'Degree 2']
+
+        # Signed contributions, other aggregations and other spreads.
+        importance, _, _ = es.degree_importance(std_arr, magnitude=False)
+        assert np.all(np.abs(importance - np.mean(contributions, axis=0)) < tol)
+        importance, _, _ = es.degree_importance(std_arr, agg='median')
+        assert np.all(np.abs(importance - np.median(np.abs(contributions), axis=0)) < tol)
+        importance, _, _ = es.degree_importance(std_arr, agg='sum')
+        assert np.all(np.abs(importance - np.sum(np.abs(contributions), axis=0)) < tol)
+        _, spread, _ = es.degree_importance(std_arr, error='sem')
+        assert np.all(np.abs(spread - np.std(np.abs(contributions), axis=0) / np.sqrt(2)) < tol)
+        _, spread, _ = es.degree_importance(std_arr, error=None)
+        assert spread is None
+
+        # The support vectors are used when no observations are provided.
+        importance_sv, _, _ = es.degree_importance()
+        importance, _, _ = es.degree_importance(std_arr)
+        assert np.all(np.abs(importance_sv - importance) < tol)
+
+        with pytest.raises(ValueError):
+            es.degree_importance(std_arr, agg='average')
+
+        with pytest.raises(ValueError):
+            es.degree_importance(std_arr, error='variance')
 
     def test_get_interactions(self, std_d, std_p, std_r, std_idx, std_gamma):
         """
@@ -942,3 +1111,99 @@ class TestExPSVM:
 
         fig = es.plot_sample_waterfall_degree(x=std_arr[0,:], n_degree=2, show=False)
         assert isinstance(fig, matplotlib.figure.Figure)
+
+        # The default, all degrees of the kernel.
+        fig = es.plot_sample_waterfall_degree(x=std_arr[0, :], show=False)
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+        # More degrees than the kernel has are reduced to the degree of the kernel.
+        fig = es.plot_sample_waterfall_degree(x=std_arr[0, :], n_degree=10, show=False)
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+        # A transformed model is not needed to visualize the degrees.
+        es_no_transform = exp.ExPSVM(sv=std_arr, dual_coef=std_dual_coef,
+                                     kernel_d=std_d, kernel_r=std_r, kernel_gamma=std_gamma,
+                                     p=std_p, intercept=1)
+        fig = es_no_transform.plot_sample_waterfall_degree(x=std_arr[0, :], show=False)
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+    def test_plot_degree_importance(self, std_arr, std_dual_coef, std_d, std_gamma,
+                                    std_r, std_p):
+        """
+        Verify that plot_degree_importance outputs a matplotlib figure for both styles.
+        """
+        es = exp.ExPSVM(sv=std_arr, dual_coef=std_dual_coef,
+                        kernel_d=std_d, kernel_r=std_r, kernel_gamma=std_gamma,
+                        p=std_p, intercept=1)
+
+        # Bar chart, with and without the markers of the signed contributions.
+        fig = es.plot_degree_importance(x=std_arr, show=False)
+        assert isinstance(fig, matplotlib.figure.Figure)
+        fig = es.plot_degree_importance(x=std_arr, magnitude=False, error=None, show=False)
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+        # Box plot.
+        fig = es.plot_degree_importance(x=std_arr, style='box', show=False)
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+        # The support vectors are used when no observations are provided.
+        fig = es.plot_degree_importance(show=False)
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+        # The x-label names the quantity, so the ticks hold the degree alone and are not rotated.
+        for style in ['bar', 'box']:
+            fig = es.plot_degree_importance(x=std_arr, style=style, show=False)
+            assert [label.get_text() for label in fig.axes[0].get_xticklabels()] == ['1', '2']
+            assert fig.axes[0].get_xlabel() == 'Polynomial degree'
+            assert np.all([label.get_rotation() == 0 for label in fig.axes[0].get_xticklabels()])
+            fig = es.plot_degree_importance(x=std_arr, style=style, rotation=90, show=False)
+            assert np.all([label.get_rotation() == 90 for label in fig.axes[0].get_xticklabels()])
+
+            # The zeroth degree is named in the same way.
+            fig = es.plot_degree_importance(x=std_arr, style=style, include_d0=True, show=False)
+            assert [label.get_text() for label in fig.axes[0].get_xticklabels()] == ['0', '1', '2']
+
+    def test_plot_degree_importance_intercept(self, std_arr, std_dual_coef, std_d, std_gamma,
+                                              std_r, std_p, std_intercept):
+        """
+        Verify that plot_degree_importance includes the intercept as a bar among the degrees and as a
+        horizontal line beside the boxes, and that it is excluded by default.
+        """
+        es = exp.ExPSVM(sv=std_arr, dual_coef=std_dual_coef,
+                        kernel_d=std_d, kernel_r=std_r, kernel_gamma=std_gamma,
+                        p=std_p, intercept=std_intercept)
+        tol = 1e-10
+
+        # The intercept is a bar of its own, of the same magnitude for every observation.
+        fig = es.plot_degree_importance(x=std_arr, include_intercept=True, show=False)
+        ax = fig.axes[0]
+        assert [label.get_text() for label in ax.get_xticklabels()] == ['Intercept', '1', '2']
+        assert np.abs(ax.patches[0].get_height() - np.abs(std_intercept)) < tol
+
+        # The marker of the signed contribution is drawn for the intercept as well.
+        markers = [line for line in ax.get_lines() if line.get_marker() == 'D']
+        assert np.abs(np.asarray(markers[0].get_ydata())[0] - std_intercept) < tol
+
+        # The intercept is a line beside the boxes, since a box of a constant carries no information.
+        fig = es.plot_degree_importance(x=std_arr, style='box', include_intercept=True, show=False)
+        ax = fig.axes[0]
+        assert [label.get_text() for label in ax.get_xticklabels()] == ['1', '2']
+        intercept_lines = []
+        for line in ax.get_lines():
+            # The y-data is a list for horizontal lines and an array for the parts of the boxes.
+            # The outlier lines of the boxes hold no data at all.
+            y_data = np.asarray(line.get_ydata())
+            if (y_data.size > 0) and np.all(np.abs(y_data - std_intercept) < tol):
+                intercept_lines.append(line)
+        assert len(intercept_lines) == 1
+        assert intercept_lines[0].get_color() == 'tab:orange'
+        assert [text.get_text() for text in ax.get_legend().get_texts()] == ['Intercept']
+
+        # The intercept is excluded by default.
+        fig = es.plot_degree_importance(x=std_arr, show=False)
+        assert [label.get_text() for label in fig.axes[0].get_xticklabels()] == ['1', '2']
+        fig = es.plot_degree_importance(x=std_arr, style='box', show=False)
+        assert fig.axes[0].get_legend() is None
+
+        with pytest.raises(ValueError):
+            es.plot_degree_importance(x=std_arr, style='violin', show=False)

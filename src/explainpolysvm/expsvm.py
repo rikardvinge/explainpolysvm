@@ -34,7 +34,7 @@ import numpy as np
 import itertools as it
 from typing import List, Tuple, Union
 from sklearn.svm import SVC, SVR
-from .plot import waterfall, bar
+from .plot import waterfall, bar, box
 
 
 class InteractionUtils:
@@ -269,8 +269,9 @@ class ExPSVM:
             has dimensionality 3.
 
         _poly_coef : dict
-            Dictionary containing constants relating to the dimensionality of the interaction,
-            i.e. different constant for first order interactions compared to second order interactions. Calculated as
+            Cache of the poly_coef property, empty until the property is first used. Contains constants
+            relating to the dimensionality of the interaction, i.e. different constant for first order
+            interactions compared to second order interactions. Calculated as
             (kernel_d choose d)*r^(kernel_d - d) where d is the dimensionality of the interaction.
 
         interaction_mask : numpy.ndarray of bool of shape (n_interactions,)
@@ -361,6 +362,33 @@ class ExPSVM:
         # Transform
         if transform:
             self.transform_svm()
+
+    @property
+    def poly_coef(self) -> dict:
+        """
+        Constants of the polynomial kernel, one per degree of the kernel.
+
+        The constant of degree d is (kernel_d choose d)*r^(kernel_d - d), which is the factor that the
+        interactions of degree d carry in the linear model. The kernel coefficient gamma is not
+        included, since the linear model and the degree contributions apply it differently.
+
+        The constants only depend on the kernel parameters, so they are calculated once, at the first
+        use, and stored in _poly_coef.
+
+        Degree 0 is included, and is used by the degree contributions. It has no counterpart in
+        _interactions, _perm_count and _interaction_dims, which describe interactions and therefore
+        start at degree 1: degree 0 contributes a constant rather than an interaction, and that
+        constant is zero for a trained SVM since the dual coefficients sum to zero.
+
+        Returns
+        -------
+        poly_coef : dict
+            Constant of each degree, of degree 0, 1,..., kernel_d.
+        """
+        if not self._poly_coef:
+            self._poly_coef = {d: comb(self.kernel_d, d) * (self.kernel_r ** (self.kernel_d - d))
+                               for d in np.arange(0, self.kernel_d + 1)}
+        return self._poly_coef
 
     def get_interactions(self, **kwargs) -> np.ndarray:
         """
@@ -477,14 +505,15 @@ class ExPSVM:
 
     def _set_transform(self) -> None:
         """
-        Set _interactions, _perm_count, _interaction_dims and _poly_coef based on the number of features and the
-        chosen polynomial kernel.
+        Set _interactions, _perm_count and _interaction_dims based on the number of features and the
+        chosen polynomial kernel. The constants of the polynomial kernel are provided by the poly_coef
+        property.
 
         Returns
         -------
         self : Instance
-            Instance with _interactions, _perm_count, _interaction_dims and _poly_coef based on the number of features
-            and the chosen polynomial kernel.
+            Instance with _interactions, _perm_count and _interaction_dims based on the number of
+            features and the chosen polynomial kernel.
         """
         for d in np.arange(1, self.kernel_d + 1):
             tp = InteractionUtils(d, self.p)
@@ -492,7 +521,6 @@ class ExPSVM:
             self._interactions = np.concatenate((self._interactions, idx_tmp))
             self._perm_count = np.concatenate((self._perm_count, n_perm_tmp))
             self._interaction_dims = np.concatenate((self._interaction_dims, d * np.ones((len(idx_tmp),))))
-            self._poly_coef[d] = comb(self.kernel_d, d) * (self.kernel_r ** (self.kernel_d - d))
 
     def _compress_transform(self, x: np.ndarray, reduce_memory: bool = False,
                             mask: bool = False, output_dict: bool = False):
@@ -622,7 +650,7 @@ class ExPSVM:
                 # Sum over support vectors.
                 transform_tmp = np.sum(transform_tmp, axis=0, keepdims=False)
                 # Multiply by binomial coefficient and gamma constant.
-                transform[d] = self._poly_coef[d] * (self.kernel_gamma ** d) * transform_tmp
+                transform[d] = self.poly_coef[d] * (self.kernel_gamma ** d) * transform_tmp
 
         # Create linear model
         self.linear_model = np.expand_dims(dict2array(transform), axis=1)
@@ -711,6 +739,272 @@ class ExPSVM:
         dot_prod = self.decision_function_components(x=x, output_interaction_names=False,
                                                      reduce_memory=reduce_memory, mask=mask)
         return np.sum(dot_prod, axis=1, keepdims=False)
+
+    def _observation_chunk_size(self, n_observation: int, reduce_memory: bool = False,
+                                chunk_size: int = None) -> int:
+        """
+        Number of observations to handle at a time when calculating degree contributions.
+
+        The intermediate arrays are of shape (n_SV, chunk size), which is what sets the memory
+        requirement. An explicit chunk size takes precedence over reduce_memory.
+
+        Parameters
+        ----------
+        n_observation : int
+            Number of observations to handle.
+        reduce_memory : Boolean
+            Set to True to choose a chunk size that keeps the intermediate arrays at roughly 64 MB.
+            Default is False, in which case all observations are handled at once.
+        chunk_size : int
+            Number of observations to handle at a time. Overrides reduce_memory.
+
+        Returns
+        -------
+        chunk_size : int
+            Number of observations to handle at a time. At least 1.
+        """
+        if chunk_size is not None:
+            if chunk_size < 1:
+                raise ValueError(f"chunk_size should be a positive integer but got {chunk_size}.")
+            return int(chunk_size)
+        if reduce_memory:
+            # 8e6 elements of float64 is roughly 64 MB per intermediate array.
+            return max(1, int(8e6 / max(1, self.sv.shape[0])))
+        return max(1, n_observation)
+
+    def _degree_terms(self, x: np.ndarray, reduce_memory: bool = False, chunk_size: int = None) -> np.ndarray:
+        """
+        Calculate the contribution of every degree of the polynomial kernel to the decision function.
+
+        The polynomial kernel SVM decision function can be written as a sum over the degrees of the
+        kernel,
+        f(x) = sum_d (kernel_d choose d)*r^(kernel_d - d)*gamma^d*sum_i dual_coef_i*(sv_i^T x)^d + intercept,
+        where the inner sum runs over the support vectors. The contribution of each degree is the
+        corresponding term of the outer sum. Calculating it requires one matrix multiplication and one
+        element-wise multiplication per degree, so the cost is independent of the number of
+        interactions. Neither transform_svm() nor interaction_mask are involved.
+
+        Parameters
+        ----------
+        x : Numpy ndarray of shape (n_observations, n_features)
+            Observations to calculate the degree contributions for.
+        reduce_memory : Boolean
+            Set to True to handle the observations in chunks, reducing memory usage. Default is False.
+        chunk_size : int
+            Number of observations to handle at a time. Overrides reduce_memory.
+
+        Returns
+        -------
+        degree_terms : Numpy ndarray of shape (n_observations, kernel_d + 1)
+            Contribution of each degree of the polynomial kernel. Column d holds the contribution of
+            degree d, starting at degree 0.
+        """
+        if len(x.shape) == 1:
+            x = np.reshape(x, (1, -1))
+        if len(x.shape) > 2:
+            raise ValueError(f"x should be 2-dimensional but got {x.shape}.")
+
+        n_observation = x.shape[0]
+        chunk_size = self._observation_chunk_size(n_observation, reduce_memory=reduce_memory,
+                                                  chunk_size=chunk_size)
+
+        # Constant of each degree, (kernel_d choose d)*r^(kernel_d - d)*gamma^d.
+        degree_coef = np.array([self.poly_coef[d] * (self.kernel_gamma ** d)
+                                for d in np.arange(0, self.kernel_d + 1)])
+
+        degree_terms = np.zeros((n_observation, self.kernel_d + 1))
+        for start in np.arange(0, n_observation, chunk_size):
+            stop = min(start + chunk_size, n_observation)
+            # Inner products between the support vectors and the observations of the chunk.
+            gram = np.matmul(self.sv, np.transpose(x[start:stop, :]))
+            # Raise the inner products to the current degree one degree at a time.
+            gram_power = np.ones(gram.shape)
+            for d in np.arange(0, self.kernel_d + 1):
+                # Multiply by the SVM dual coefficients and sum over support vectors.
+                degree_terms[start:stop, d] = degree_coef[d] * np.sum(np.multiply(self.dual_coef, gram_power),
+                                                                      axis=0, keepdims=False)
+                gram_power = np.multiply(gram_power, gram)
+        return degree_terms
+
+    def _degree_names(self, include_d0: bool = False, short: bool = False) -> List[str]:
+        """
+        Names of the degrees returned by degree_contributions().
+
+        Parameters
+        ----------
+        include_d0 : Boolean
+            Set to True to include the name of the zeroth degree. Default is False.
+        short : Boolean
+            Set to True to name each degree by its number alone. Used for tick labels, where the axis
+            label already states that the ticks are the degrees of the polynomial kernel. Default is
+            False, which names the degrees 'Degree 1', 'Degree 2' and so on.
+
+        Returns
+        -------
+        degree_names : List of strings
+            Names of the degrees, in the order returned by degree_contributions().
+        """
+        first_degree = 0 if include_d0 else 1
+        degrees = np.arange(first_degree, self.kernel_d + 1)
+        if short:
+            return [f'{d}' for d in degrees]
+        return [f'Degree {d}' for d in degrees]
+
+    def degree_contributions(self, x: np.ndarray, include_intercept: bool = False,
+                             include_d0: bool = False, reduce_memory: bool = False,
+                             chunk_size: int = None) -> np.ndarray:
+        """
+        Returns the contribution of each degree of the polynomial kernel to the decision function.
+
+        The contributions are additive: together with the intercept they sum to decision_function(x).
+        Where feature_importance() and decision_function_components() describe which interactions
+        matter, the degree contributions describe how much of the decision function each polynomial
+        degree is responsible for, which informs the choice of kernel degree for a problem.
+
+        This calculation does not use the compressed linear model, so it neither requires a call to
+        transform_svm() nor grows with the number of interactions. The interaction mask is not
+        applied: the degree contributions always describe the full model.
+
+        Note that the contribution of degree 0 is zero for a trained SVM, since the dual coefficients
+        of a trained SVM sum to zero. It is available through include_d0 as a check of the model.
+
+        Parameters
+        ----------
+        x : Numpy ndarray of shape (n_observations, n_features) or (n_features,)
+            Observations to calculate the degree contributions for.
+        include_intercept : Boolean
+            Set to True to prepend the intercept to the contributions. Default is False.
+        include_d0 : Boolean
+            Set to True to include the contribution of degree 0. Default is False.
+        reduce_memory : Boolean
+            Set to True to handle the observations in chunks, reducing memory usage. Default is False.
+        chunk_size : int
+            Number of observations to handle at a time. Overrides reduce_memory.
+
+        Returns
+        -------
+        contributions : Numpy ndarray of shape (n_observations, kernel_d)
+            Contribution of each degree of the polynomial kernel to the decision function, of degree
+            1, 2,..., kernel_d. The contribution of degree 0 is prepended if include_d0 is True and
+            the intercept is prepended if include_intercept is True.
+        """
+        degree_terms = self._degree_terms(x=x, reduce_memory=reduce_memory, chunk_size=chunk_size)
+
+        # Drop the zeroth degree unless it is asked for.
+        if include_d0:
+            contributions = degree_terms
+        else:
+            contributions = degree_terms[:, 1:]
+
+        # Prepend the independent component, the SVM intercept.
+        if include_intercept:
+            contributions = np.concatenate((self.intercept * np.ones((contributions.shape[0], 1)),
+                                            contributions), axis=1)
+        return contributions
+
+    def _aggregate_degrees(self, contributions: np.ndarray, agg: str = 'mean', magnitude: bool = True,
+                           error: str = 'std') -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Aggregate degree contributions over the observations.
+
+        Kept separate from degree_importance() so that the contributions can be aggregated in more
+        than one way without calculating them more than once.
+
+        Parameters
+        ----------
+        contributions : Numpy ndarray of shape (n_observations, n_degrees)
+            Degree contributions, as returned by degree_contributions().
+        agg : str
+            Aggregation of the contributions over the observations. One of 'mean' (default), 'median'
+            and 'sum'.
+        magnitude : Boolean
+            If True (default) aggregate the magnitude of the contributions, otherwise aggregate the
+            signed contributions.
+        error : str
+            Spread of the contributions over the observations. One of 'std' (default), 'sem' for the
+            standard error of the mean, 'iqr' for the interquartile range, and None for no spread.
+
+        Returns
+        -------
+        importance : Numpy ndarray of shape (n_degrees,)
+            Aggregated contribution of each degree.
+        spread : Numpy ndarray of shape (n_degrees,) or None
+            Spread of the contribution of each degree over the observations. None if error is None.
+        """
+        if magnitude:
+            contributions = np.abs(contributions)
+
+        if agg == 'mean':
+            importance = np.mean(contributions, axis=0)
+        elif agg == 'median':
+            importance = np.median(contributions, axis=0)
+        elif agg == 'sum':
+            importance = np.sum(contributions, axis=0, keepdims=False)
+        else:
+            raise ValueError(f"agg should be one of 'mean', 'median' and 'sum'. Current value: {agg}")
+
+        if error is None:
+            spread = None
+        elif error == 'std':
+            spread = np.std(contributions, axis=0)
+        elif error == 'sem':
+            spread = np.std(contributions, axis=0) / np.sqrt(contributions.shape[0])
+        elif error == 'iqr':
+            spread = (np.percentile(contributions, 75, axis=0) - np.percentile(contributions, 25, axis=0))
+        else:
+            raise ValueError(f"error should be one of 'std', 'sem', 'iqr' and None. Current value: {error}")
+
+        return importance, spread
+
+    def degree_importance(self, x: np.ndarray = None, agg: str = 'mean', magnitude: bool = True,
+                          error: str = 'std', include_d0: bool = False, reduce_memory: bool = False,
+                          chunk_size: int = None):
+        """
+        Aggregate the degree contributions of a set of observations into one value per degree.
+
+        Signed contributions of a degree cancel each other out when averaged over observations, so the
+        default aggregates the magnitude of the contributions. Set magnitude to False to aggregate the
+        signed contributions, which shows in which direction a degree pushes the decision function on
+        average.
+
+        Parameters
+        ----------
+        x : Numpy ndarray of shape (n_observations, n_features) or (n_features,)
+            Observations to aggregate the degree contributions of. The support vectors of the SVM are
+            used if no observations are provided.
+        agg : str
+            Aggregation of the contributions over the observations. One of 'mean' (default), 'median'
+            and 'sum'.
+        magnitude : Boolean
+            If True (default) aggregate the magnitude of the contributions, otherwise aggregate the
+            signed contributions.
+        error : str
+            Spread of the contributions over the observations. One of 'std' (default), 'sem' for the
+            standard error of the mean, 'iqr' for the interquartile range, and None for no spread.
+        include_d0 : Boolean
+            Set to True to include the contribution of degree 0. Default is False.
+        reduce_memory : Boolean
+            Set to True to handle the observations in chunks, reducing memory usage. Default is False.
+        chunk_size : int
+            Number of observations to handle at a time. Overrides reduce_memory.
+
+        Returns
+        -------
+        importance : Numpy ndarray of shape (kernel_d,)
+            Aggregated contribution of each degree.
+        spread : Numpy ndarray of shape (kernel_d,) or None
+            Spread of the contribution of each degree over the observations. None if error is None.
+        degree_names : List of strings
+            Names of the degrees.
+        """
+        if x is None:
+            x = self.sv
+
+        contributions = self.degree_contributions(x=x, include_intercept=False, include_d0=include_d0,
+                                                  reduce_memory=reduce_memory, chunk_size=chunk_size)
+        importance, spread = self._aggregate_degrees(contributions, agg=agg, magnitude=magnitude,
+                                                     error=error)
+        return importance, spread, self._degree_names(include_d0=include_d0)
 
     def feature_importance(self, sort: bool = True, format_names: bool = False, magnitude: bool = True,
                            include_intercept: bool = True, **kwargs):
@@ -1016,32 +1310,150 @@ class ExPSVM:
         return waterfall(bar_widths, labels, **kwargs)
 
     def plot_sample_waterfall_degree(self, x: np.ndarray, n_degree: int = None, **kwargs):
+        """
+        Visualize the contribution of each degree of the polynomial kernel for a single observation
+        using a waterfall graph.
+
+        The contributions are calculated with degree_contributions() and therefore neither require a
+        call to transform_svm() nor grow with the number of interactions.
+
+        Parameters
+        ----------
+        x : np.ndarray
+            Sample to visualize. Should have shape (n_original_features,).
+        n_degree : int
+            Number of degrees to explicitly show. Any remaining degrees will be bunched together into
+            a "Remaining" bar. Default is the degree of the polynomial kernel. n_degree is set to the
+            degree of the kernel if a larger value is provided.
+        kwargs : Comma-separated list key-value pairs
+            Arguments to forward to plot._waterfall.waterfall
+
+        Returns
+        -------
+        matplotlib.figure.Figure or None
+        """
         # Check validity of observation
         x = np.squeeze(x)
         if len(x.shape) > 1:
             raise ValueError(f'Input observation x should have dimension (n_feature,). '
                              f'Shape of provided input {x.shape}')
 
-        if (n_degree is None) | (n_degree > self.kernel_d):
+        if (n_degree is None) or (n_degree > self.kernel_d):
             n_degree = self.kernel_d
 
-        # Calculate decision function value and components
-        y_comp, _ = self.decision_function_components(x=x, include_intercept=False,
-                                                               output_interaction_names=True,
-                                                               format_interaction_names=True)
+        # Calculate the contribution of each degree, of degree 1, 2,..., kernel_d.
+        contributions = self.degree_contributions(x=x)[0, :]
 
-        bar_widths = np.array([self.intercept] + [y_comp[0, self._interaction_dims == d].sum()
-                                                  for d in np.arange(1, n_degree+1)])
-        labels = ['Intercept'] + [f'Degree {i}' for i in np.arange(1, n_degree+1)]
+        bar_widths = np.concatenate(([self.intercept], contributions[0:n_degree]))
+        labels = ['Intercept'] + [f'Degree {i}' for i in np.arange(1, n_degree + 1)]
 
-        # Check if there are any interactions that are not shown
+        # Check if there are any degrees that are not shown
         n_remaining = self.kernel_d - n_degree
         if n_remaining > 0:
-            bar_widths = np.append(bar_widths, y_comp[0, self._interaction_dims > n_degree].sum())
-            # labels = np.append(labels, f'Remaining {n_remaining} interactions')
+            bar_widths = np.append(bar_widths, np.sum(contributions[n_degree:], keepdims=False))
             labels.append(f'Remaining {n_remaining} degrees')
 
         return waterfall(bar_widths, labels, **kwargs)
+
+    def plot_degree_importance(self, x: np.ndarray = None, agg: str = 'mean', magnitude: bool = True,
+                               error: str = 'std', style: str = 'bar', include_intercept: bool = False,
+                               include_d0: bool = False, rotation: int = 0, reduce_memory: bool = False,
+                               chunk_size: int = None, **kwargs):
+        """
+        Visualize the contribution of each degree of the polynomial kernel over a set of observations.
+
+        A waterfall graph, as used by plot_sample_waterfall_degree() for a single observation, is not
+        meaningful here: aggregated contributions no longer add up to the decision function value of
+        any particular observation. Two visualizations are available instead.
+
+        With style 'bar', the aggregated contribution of each degree is drawn as a bar with error bars
+        of the spread over the observations. When the magnitude of the contributions is aggregated,
+        which is the default, the aggregated signed contribution is added as a marker on each bar. A
+        marker close to zero on a tall bar means that the degree contributes to individual decisions
+        but has no preferred direction over the observations.
+
+        With style 'box', the signed contributions of the observations are summarized in a box plot
+        per degree, which shows the spread without choosing an aggregation.
+
+        Parameters
+        ----------
+        x : Numpy ndarray of shape (n_observations, n_features) or (n_features,)
+            Observations to visualize the degree contributions of. The support vectors of the SVM are
+            used if no observations are provided.
+        agg : str
+            Aggregation of the contributions over the observations. One of 'mean' (default), 'median'
+            and 'sum'. Not used by style 'box'.
+        magnitude : Boolean
+            If True (default) aggregate the magnitude of the contributions, otherwise aggregate the
+            signed contributions. Not used by style 'box'.
+        error : str
+            Spread of the contributions over the observations. One of 'std' (default), 'sem' for the
+            standard error of the mean, 'iqr' for the interquartile range, and None for no spread.
+            Not used by style 'box'.
+        style : str
+            Type of graph. One of 'bar' (default) and 'box'.
+        include_intercept : Boolean
+            Set to True to include the intercept of the SVM, which is the same for every observation.
+            Style 'bar' adds it as a bar beside the degrees and style 'box' as a horizontal line,
+            since a box of a constant carries no information. Default is False.
+        include_d0 : Boolean
+            Set to True to include the contribution of degree 0. Default is False.
+        rotation : int
+            Rotation of the x-tick labels in degrees. Default is 0, since the names of the degrees are
+            short and few. Increase it if the labels of a high degree kernel overlap.
+        reduce_memory : Boolean
+            Set to True to handle the observations in chunks, reducing memory usage. Default is False.
+        chunk_size : int
+            Number of observations to handle at a time. Overrides reduce_memory.
+        kwargs : Comma-separated list key-value pairs
+            Arguments to forward to plot._bar.bar or plot._box.box.
+
+        Returns
+        -------
+        matplotlib.figure.Figure or None
+        """
+        if x is None:
+            x = self.sv
+
+        if style not in ('bar', 'box'):
+            raise ValueError(f"style should be one of 'bar' and 'box'. Current value: {style}")
+
+        xlabel = 'Polynomial degree'
+        title = 'Contribution per polynomial degree'
+        # The x-label states what the ticks are, so the ticks only hold the degree itself.
+        degree_names = self._degree_names(include_d0=include_d0, short=True)
+
+        # The intercept is a bar among the degrees, but a line beside the boxes, since the intercept
+        # is the same for every observation and its box would be a single line anyway.
+        intercept_bar = include_intercept and (style == 'bar')
+        if intercept_bar:
+            degree_names = ['Intercept'] + degree_names
+
+        # Calculate the contributions once, whichever way they are then summarized.
+        contributions = self.degree_contributions(x=x, include_intercept=intercept_bar,
+                                                  include_d0=include_d0, reduce_memory=reduce_memory,
+                                                  chunk_size=chunk_size)
+
+        if style == 'box':
+            return box(contributions, degree_names, xlabel=xlabel,
+                       ylabel='Decision function contribution', title=title, rotation=rotation,
+                       hline=self.intercept if include_intercept else None,
+                       hline_label='Intercept' if include_intercept else None, **kwargs)
+        else:
+            importance, spread = self._aggregate_degrees(contributions, agg=agg, magnitude=magnitude,
+                                                         error=error)
+            ylabel = f'{agg.capitalize()} decision function contribution'
+            markers = None
+            marker_label = None
+            if magnitude:
+                ylabel += ' magnitude'
+                title += ' (magnitude)'
+                # Add the signed contribution as markers to show cancellation between observations.
+                markers, _ = self._aggregate_degrees(contributions, agg=agg, magnitude=False, error=None)
+                marker_label = f'Signed {agg}'
+            return bar(importance, degree_names, xlabel=xlabel, ylabel=ylabel, title=title,
+                       yerr=spread, markers=markers, marker_label=marker_label,
+                       rotation=rotation, **kwargs)
 
 
 

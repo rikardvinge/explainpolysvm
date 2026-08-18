@@ -5,3 +5,4 @@ except ImportError:
 
 from ._waterfall import waterfall
 from ._bar import bar
+from ._box import box

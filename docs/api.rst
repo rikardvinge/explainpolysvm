@@ -25,4 +25,6 @@ labels, and return a :class:`matplotlib.figure.Figure` when called with :code:`s
 
 .. autofunction:: explainpolysvm.plot.bar
 
+.. autofunction:: explainpolysvm.plot.box
+
 .. autofunction:: explainpolysvm.plot.waterfall
