@@ -9,6 +9,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `ExPSVM.degree_contributions()`, the contribution of each degree of the polynomial kernel to the
+  decision function. The contributions and the intercept sum to the decision function, and the
+  calculation requires neither a call to `transform_svm()` nor memory proportional to the number of
+  interactions, so it is available for models that are too large to expand.
+- `ExPSVM.degree_importance()`, aggregating the degree contributions of a set of observations, and
+  `ExPSVM.plot_degree_importance()`, visualizing them as a bar chart with error bars or as a box plot.
+  The support vectors are used when no observations are provided.
+- `plot.box()`, a box plot helper, and error bars and markers in `plot.bar()`.
 - Documentation built with Sphinx: an API reference generated from the docstrings, and pages on
   interpreting the explanations, on scaling and memory, and on when the explanations are exact.
 - This changelog.
@@ -31,6 +39,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - `get_linear_model()` applies the `d` and `interaction_strs` selection among the interactions of a
   masked linear model. It previously ignored them, which is what caused the mismatch above.
+- `plot_sample_waterfall_degree()` calculates the contribution of each degree directly instead of
+  summing the interactions of the linear model. The graph is unchanged, but the method no longer needs
+  a transformed model and no longer grows with the number of interactions. Its `n_degree=None`
+  default, documented but broken, now works.
 - Remaining `str.format()` calls replaced by f-strings.
 
 ### Security

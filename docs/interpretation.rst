@@ -40,6 +40,48 @@ contributions are **additive**: they sum, together with the intercept, to
 For classification the decision function is the signed distance to the separating hyperplane, not a
 probability. For regression it is the predicted value.
 
+Degree importance
+-----------------
+
+:code:`degree_contributions(x)` answers a coarser question than the interaction weights: **how much of
+the decision function does each degree of the polynomial kernel account for?** The contributions are
+additive in the same way as the local explanations, together with the intercept they sum to
+:code:`decision_function(x)`, but they are grouped by degree rather than by interaction.
+
+Use this analysis when choosing a kernel degree. A model whose decision function is
+carried almost entirely by degree 1 is telling you that a linear kernel would have done, and one that
+puts most of its weight in the highest degree is telling you that the interactions matter.
+
+Two properties are worth knowing:
+
+* It does not require :code:`transform_svm()`, and its cost does not grow with the number of
+  interactions, instead it constitutes one matrix multiplication per degree. It is therefore available 
+  for models where the full interaction expansion is out of reach.
+* It always describes the full model. The interaction mask is deliberately not applied, since
+  applying it would require the expansion that this calculation avoids.
+
+The contribution of degree 0 is zero for a trained SVM, because the dual coefficients sum to zero given 
+the KKT conditions. It is available through :code:`include_d0=True` as a check that a model is what it 
+claims to be.
+
+Aggregating over many observations
+``````````````````````````````````
+
+:code:`degree_importance()` and :code:`plot_degree_importance()` summarise the contributions of a set
+of observations. With no observations given, the support vectors are used.
+
+Signed contributions largely cancel when averaged over a balanced dataset, so the default aggregates
+their **magnitude**: how much each degree moves the decision function, irrespective of direction. The
+bar chart adds the signed aggregate as a marker on each bar, which makes the distinction visible — a
+marker near zero on a tall bar means the degree matters for individual predictions but has no
+preferred direction across the dataset. :code:`style='box'` shows the distribution of the signed
+contributions instead, which avoids choosing an aggregation at all.
+
+For a single observation, :code:`plot_sample_waterfall_degree()` keeps the waterfall form, since the
+contributions of one observation do add up to its decision value. That is no longer true once
+observations are aggregated, which is why the aggregate view is a bar or box chart rather than a
+waterfall.
+
 How the kernel parameters shape what you can see
 ------------------------------------------------
 
