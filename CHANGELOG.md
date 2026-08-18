@@ -47,7 +47,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Security
 
+- Releases are published to PyPI with Trusted Publishing, which mints a short-lived OpenID Connect
+  token for the release job. No long-lived API token is stored in the repository.
 - The PyPI token is passed to twine through the environment instead of on the command line, where it
-  was visible in the runner's process list.
+  was visible in the runner's process list. Superseded by Trusted Publishing, above.
 - The CI workflow declares `permissions: contents: read` instead of inheriting the repository default
   token scope, and checks out without persisting credentials.
